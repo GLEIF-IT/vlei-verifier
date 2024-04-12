@@ -1,0 +1,47 @@
+version: '3.8'
+
+# networks:
+#   reg:
+
+services:
+  witnesses:
+    # container_name: witnesshost
+    # hostname: witnesshost
+    image: 2byrds/keripy:latest
+    platform: linux/amd64
+    tty: true
+    volumes:
+      - ./scripts/keri/cf/main/:/keripy/scripts/keri/cf/main/
+    ports:
+        - 5642:5642  # witness
+        - 5643:5643  # witness
+        - 5644:5644  # witness
+    entrypoint: kli witness demo
+
+  vlei:
+    image: 2byrds/vlei:latest
+    container_name: vlei
+    hostname: vlei
+    ports:
+      - 7723:7723
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=UTF-8
+    entrypoint: [ "vLEI-server", "-s", "./schema/acdc", "-c" , "./samples/acdc/", "-o", "./samples/oobis/" ]
+
+  # vlei-verifier:
+  #   build:
+  #     context: .
+  #     dockerfile: ./images/verifier.dockerfile
+  #   image: 2byrds/vlei-verifier:latest
+  #   container_name: vlei-verifier
+  #   hostname: vlei-verifier
+  #   depends_on:
+  #     - vlei
+  #     - witnesses
+  #   ports:
+  #     - 7676:7676
+  #   # networks:
+  #   #   - reg
+  #   # volumes:
+  #   #   - './data/keri:/usr/local/var/keri'

@@ -7,15 +7,15 @@ Command line runner for app
 """
 import multicommand
 import logging
+from keri import help
+
+help.ogler.level = logging.DEBUG
+help.ogler.reopen(name="verifer", temp=True, clear=True)
 
 from keri.app import directing
 
 from verifier.app.cli import commands
-from keri import help
 
-
-help.ogler.level = logging.CRITICAL
-help.ogler.reopen(name="verifer", temp=True, clear=True)
 
 
 def main():

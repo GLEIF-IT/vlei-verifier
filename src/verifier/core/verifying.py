@@ -121,7 +121,7 @@ class PresentationResourceEndpoint:
                     break
 
         if not found:
-            raise falcon.HTTPBadRequest(description=f"credential {said} not processed in body of request")
+            raise falcon.HTTPBadRequest(description=f"credential {said} from body of request was not found")
 
         print(f"Credential {said} presented.")
 

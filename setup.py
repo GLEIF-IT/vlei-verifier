@@ -34,7 +34,7 @@ from setuptools import setup
 
 setup(
     name='verifier',
-    version='0.0.1',  # also change in src/verifier/__init__.py
+    version='0.0.2',  # also change in src/verifier/__init__.py
     license='Apache Software License 2.0',
     description='Verifier: Proof of Concept vLEI Verifier',
     long_description="Verifier: Proof of Concept vLEI Verifier.",
@@ -54,7 +54,7 @@ setup(
         'Operating System :: Unix',
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
-        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: Implementation :: CPython',
         # uncomment if you test on these interpreters:
         # 'Programming Language :: Python :: Implementation :: PyPy',
@@ -73,10 +73,9 @@ setup(
         "resolver",
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
-    python_requires='>=3.10.4',
+    python_requires='>=3.12.0',
     install_requires=[
-        'hio>=0.6.9',
-        'keri @ git+https://git@github.com/WebOfTrust/keripy.git',
+        'keri>=1.1.11',
         'mnemonic>=0.20',
         'multicommand>=1.0.0',
         'falcon>=3.1.0',
