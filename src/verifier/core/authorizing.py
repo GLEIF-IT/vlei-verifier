@@ -14,7 +14,7 @@ from keri.help import helping
 
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
-EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Document Submitter"
+EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Data Submitter"
 
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
