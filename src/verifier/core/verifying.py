@@ -5,7 +5,7 @@ from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
 
 
-def setup(app, hby, vdb, reger):
+def setup(app, hby, vdb, reger, local=False):
     """ Set up verifying endpoints to process vLEI credential verifications
 
     Parameters:
@@ -16,7 +16,7 @@ def setup(app, hby, vdb, reger):
 
     """
 
-    tvy = eventing.Tevery(reger=reger, db=hby.db)
+    tvy = eventing.Tevery(reger=reger, db=hby.db, local=local)
     vry = verifying.Verifier(hby=hby, reger=reger)
 
     loadEnds(app, hby, vdb, tvy, vry)
@@ -106,10 +106,12 @@ class PresentationResourceEndpoint:
         ims = req.bounded_stream.read()
 
         self.vry.cues.clear()
+        
         parsing.Parser().parse(ims=ims,
                                kvy=self.hby.kvy,
                                tvy=self.tvy,
-                               vry=self.vry)
+                               vry=self.vry,
+                               local=True)
 
         found = False
         while self.vry.cues:

@@ -85,7 +85,7 @@ class Authorizer:
         """ Loop over any credential presentations in the iss database.
 
         Credential presentations are placed in the iss database and this loop processes them, first checking to see
-        if the credential has been cryptographically verified then funning the EBA specific business logic.
+        if the credential has been cryptographically verified then applies the EBA specific business logic.
 
         """
 

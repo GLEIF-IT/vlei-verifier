@@ -2,7 +2,6 @@
 
 import json
 import pytest
-from dkr.core import didding
 
 from hio.core import http
 from keri.app import habbing, grouping, signing
@@ -314,7 +313,7 @@ def setup_cred(hab, registry, verifier: verifying.Verifier, seqner):
 
     creder = proving.credential(
         issuer=hab.pre,
-        schema=didding.DES_ALIASES_SCHEMA,
+        schema=DES_ALIASES_SCHEMA,
         data=attrs,
         rules=rules,
         status=registry.regk,
@@ -351,7 +350,7 @@ def issue_cred(hab, regery, registry, creder):
     regery.processEscrows()
     state = registry.tever.vcState(vci=creder.said)
     if state is None or state.et not in (coring.Ilks.iss):
-        raise kering.ValidationError(f"credential {creder.said} not is correct state for issuance")
+        raise kering.ValidationError(f"credential {creder.said} not correct state for issuance")
 
 
 def revoke_cred(hab, regery, registry: credentialing.Registry, creder):
@@ -384,7 +383,7 @@ def issue_desig_aliases(seeder, hby, hab, registryName="cam"):
     verifier.processEscrows()
 
     saids = regery.reger.issus.get(keys=hab.pre)
-    scads = regery.reger.schms.get(keys=didding.DES_ALIASES_SCHEMA)
+    scads = regery.reger.schms.get(keys=DES_ALIASES_SCHEMA)
     assert len(scads) == 1
 
     return Credentialer(hby, regery, None, verifier)
@@ -452,13 +451,13 @@ def genTelCesr(reger: viring.Reger, regk: str, msgs: bytearray):
         msgs.extend(msg)
             
 @staticmethod
-def genAcdcCesr(hby, aid, creder, msgs: bytearray):
+def genAcdcCesr(hby, aid, creder, prefixer, seqner, saider, msgs: bytearray):
     # print(f"Generating {creder.crd['d']} ACDC CESR events, issued by {creder.crd['i']}")
-    cmsg = hby.habs[aid].endorse(creder)
+    cmsg = signing.serialize(creder, prefixer, seqner, saider)
     msgs.extend(cmsg)
 
 @staticmethod
-def genCredCesr(hby, reger, aid: str, schema: str, msgs: bytearray):
+def genCred(reger, aid: str, schema: str):
     # rgy = credentialing.Regery(hby=hby, name=hby.name, base=hby.base)
     saids = reger.issus.get(keys=aid)
     scads = reger.schms.get(keys=schema.encode("utf-8"))
@@ -467,12 +466,8 @@ def genCredCesr(hby, reger, aid: str, schema: str, msgs: bytearray):
     saiders = [saider for saider in saids if saider.qb64 in [saider.qb64 for saider in scads]]
     for saider in saiders:
         
-        creder, *_ = reger.cloneCred(said=saider.qb64)
-            
-        if creder.regi is not None:
-            genTelCesr(reger, creder.regi, msgs)
-            genTelCesr(reger, creder.said, msgs)
-        genAcdcCesr(hby, aid, creder, msgs)
+        creder, prefixer, seqner, saider = reger.cloneCred(said=saider.qb64)
+        return creder, prefixer, seqner, saider
         
 @staticmethod
 def addDaliasesSchema(hby):
