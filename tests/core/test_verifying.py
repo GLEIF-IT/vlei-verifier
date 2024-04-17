@@ -16,20 +16,17 @@ from verifier.core import verifying, basing
 #     # Your setup code goes here
 #     print("Setting up")
 
-def test_setup_and_endpoints(seeder):
+def test_setup_verifying(seeder):
     salt = b'0123456789abcdef'
     salter = coring.Salter(raw=salt)
 
-    # with open('tests/data/credential/credential.cesr', 'r') as cfile:
-        # vlei = cfile.read()
-    # vlei = json.dumps(cred).encode("utf-8")
-    # vlei = outputCred(hby,rgy,said)
-
-    with habbing.openHby(name="verifier", salt=salter.qb64, temp=True) as hby:
-        # habbing.openHby(name="holder", salt=salter.qb64, temp=True) as holdhby:
+    with habbing.openHby(name="verifier", salt=salter.qb64, temp=True) as hby, \
+        habbing.openHby(name="holder", salt=salter.qb64, temp=True) as holdhby:
         
-        crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_daliases_cred(seeder,hby)
-        # addDaliasesSchema(hby)
+        # this is not a vLEI ECR cred on purpose
+        # the presentation call should still succeed
+        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_daliases_cred(seeder,holdhby)
+        addDaliasesSchema(hby)
         
         issAndCred = bytearray()
         # issAndCred.extend(kmsgs)
@@ -40,7 +37,7 @@ def test_setup_and_endpoints(seeder):
         
         app = falcon.App()
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-        verifying.setup(app=app, hby=hby, vdb=vdb, reger=crdntler.rgy.reger, local=True)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=crdntler.rgy.reger)
 
         # Create a test client
         client = falcon.testing.TestClient(app)
@@ -48,11 +45,18 @@ def test_setup_and_endpoints(seeder):
         result = client.simulate_put(f'/presentations/{said}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
-        assert result.status == falcon.HTTP_OK
-        # result = client.simulate_get('/authorizations/EBcIURLpxmVwahksgrsGW6_dUw0zBhyEHYFk17eWrZfk')
-        # assert result.status == falcon.HTTP_OK
-        # result = client.simulate_get('/request/verify/EBcIURLpxmVwahksgrsGW6_dUw0zBhyEHYFk17eWrZfk')
-        # assert result.status == falcon.HTTP_OK
+        assert result.status == falcon.HTTP_202
+        
+        hby.kevers[hab.pre] = hab.kever
+        
+        # cred is not an LEI cred but is verified
+        # now authorization should still fail since authorization steps
+        # haven't been completed yet.
+        result = client.simulate_get(f'/authorizations/{hab.pre}')
+        assert result.status == falcon.HTTP_403
+        
+        result = client.simulate_post(f'/request/verify/{hab.pre}')
+        assert result.status == falcon.HTTP_403
 
 
 def get_daliases_cred(seeder, hby):
@@ -81,5 +85,5 @@ def get_daliases_cred(seeder, hby):
     acdcmsgs = bytearray()
     genAcdcCesr(hby, hab.pre, creder, prefixer, seqner, saider, acdcmsgs)
 
-    return crdntler, saiders[0].qb64, kmsgs, tmsgs, imsgs, acdcmsgs
+    return hab, crdntler, saiders[0].qb64, kmsgs, tmsgs, imsgs, acdcmsgs
     # revoke_cred(hab, crdntler.rgy, crdntler.rgy.registryByName("dAliases"), creds[0])

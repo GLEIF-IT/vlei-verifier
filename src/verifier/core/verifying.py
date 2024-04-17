@@ -38,7 +38,6 @@ def loadEnds(app, hby, vdb, tvy, vry):
     app.add_route("/presentations/{said}", presentEnd)
     presentResEnd = AuthorizationResourceEnd(hby, vdb)
     app.add_route("/authorizations/{aid}", presentResEnd)
-
     requestEnd = RequestVerifierResourceEnd(hby=hby, vdb=vdb)
     app.add_route("/request/verify/{aid}", requestEnd)
 
@@ -110,8 +109,7 @@ class PresentationResourceEndpoint:
         parsing.Parser().parse(ims=ims,
                                kvy=self.hby.kvy,
                                tvy=self.tvy,
-                               vry=self.vry,
-                               local=True)
+                               vry=self.vry)
 
         found = False
         while self.vry.cues:
