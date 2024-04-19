@@ -17,15 +17,16 @@ from verifier.core import verifying, basing
 #     print("Setting up")
 
 def test_setup_verifying(seeder):
-    salt = b'0123456789abcdef'
-    salter = coring.Salter(raw=salt)
-
-    with habbing.openHby(name="verifier", salt=salter.qb64, temp=True) as hby, \
-        habbing.openHby(name="holder", salt=salter.qb64, temp=True) as holdhby:
+    with habbing.openHab(name="verifier1", salt=b'0123456789abcdefg', temp=True) as (hby,hab), \
+        habbing.openHab(name="holder1", salt=b'123456789abcdef01', temp=True) as (holdhby, holdhab):
+        
+        regery, registry, verifier, seqner = reg_and_verf(seeder, hby, hab, schema=DES_ALIASES_SCHEMA, registryName="daliases")
+        creder = get_da_cred(issuer=hab.pre, schema=DES_ALIASES_SCHEMA, registry=registry)
         
         # this is not a vLEI ECR cred on purpose
-        # the presentation call should still succeed
-        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_daliases_cred(seeder,holdhby)
+        # the presentation call should still succeed with
+        # verifying the credential is well-formed and cryptographically correct
+        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, DES_ALIASES_SCHEMA,creder, seqner)
         addDaliasesSchema(hby)
         
         issAndCred = bytearray()
@@ -50,7 +51,59 @@ def test_setup_verifying(seeder):
         hby.kevers[hab.pre] = hab.kever
         
         # cred is not an LEI cred but is verified
-        # now authorization should still fail since authorization steps
+        # authorization should fail since authorization steps
+        # haven't been completed yet.
+        result = client.simulate_get(f'/authorizations/{hab.pre}')
+        assert result.status == falcon.HTTP_403
+        
+        result = client.simulate_post(f'/request/verify/{hab.pre}')
+        assert result.status == falcon.HTTP_403
+
+def test_ecr(seeder):        
+    with (habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab),
+          habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+        
+        regery, registry, verifier, seqner = reg_and_verf(seeder, hby, hab, schema=QVI_SCHEMA, registryName="qvissuer")
+        qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=QVI_SCHEMA, registry=registry)
+        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, QVI_SCHEMA, qvicred, seqner)
+        
+        # qviedge = [
+        #     qvi_edge()
+        # ]
+        
+        # lei_cred(issuer=hab.pre, recipient=hab.pre, schema=LEI_SCHEMA, registry=registry, sedge=sedge)
+        # regery, registry, verifier, seqner = reg_and_verf(seeder, hby, hab, schema=LEI_SCHEMA, registryName="qvissuer")
+        
+        # #chained ecr auth cred
+        # authedge = [
+        #     ecr_auth_edge("EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g")
+        # ]
+        # ecr = ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=ECR_SCHEMA, registry=registry, sedge=authedge)
+        # hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, ECR_SCHEMA,ecr, seqner)
+        
+        app = falcon.App()
+        vdb = basing.VerifierBaser(name=hby.name, temp=True)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=crdntler.rgy.reger)
+
+        issAndCred = bytearray()
+        # issAndCred.extend(kmsgs)
+        # issAndCred.extend(tmsgs)
+        # issAndCred.extend(imsgs)
+        issAndCred.extend(acdcmsgs)
+        acdc = issAndCred.decode("utf-8")
+
+        # Create a test client
+        client = falcon.testing.TestClient(app)
+        # Define the said and the credential
+        result = client.simulate_put(f'/presentations/{said}',
+                                        body=acdc,
+                                        headers={'Content-Type': 'application/json+cesr'})
+        assert result.status == falcon.HTTP_202
+        
+        hby.kevers[hab.pre] = hab.kever
+        
+        # cred is not an LEI cred but is verified
+        # authorization should fail since authorization steps
         # haven't been completed yet.
         result = client.simulate_get(f'/authorizations/{hab.pre}')
         assert result.status == falcon.HTTP_403
@@ -59,15 +112,11 @@ def test_setup_verifying(seeder):
         assert result.status == falcon.HTTP_403
 
 
-def get_daliases_cred(seeder, hby):
-    salt = b'fedcba9876543210'
-    salter = coring.Salter(raw=salt)
+def get_cred(hby, hab, regery, registry, verifier, schema, creder, seqner):
 
-    hab = hby.makeHab("hHab")
-    crdntler = issue_desig_aliases(
-        seeder, hby, hab, registryName="dAliases")
+    crdntler = create_and_issue(hby, hab, regery, registry, verifier, schema, creder, seqner)
     saiders = crdntler.rgy.reger.schms.get(
-        keys=DES_ALIASES_SCHEMA.encode("utf-8"))
+        keys=schema.encode("utf-8"))
     creds = crdntler.rgy.reger.cloneCreds(saiders,hab.db)
     
     print(f"Generating CESR event stream data from hab")
@@ -75,7 +124,7 @@ def get_daliases_cred(seeder, hby):
     genKelCesr(hby, hab.pre, kmsgs)
 
     #add designated aliases TELs and ACDCs
-    creder, prefixer, seqner, saider = genCred(crdntler.rgy.reger, hab.pre, DES_ALIASES_SCHEMA)
+    creder, prefixer, seqner, saider = genCredAnchor(crdntler.rgy.reger, hab.pre, schema)
     
     if creder.regi is not None:
         tmsgs = bytearray()

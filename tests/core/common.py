@@ -15,6 +15,10 @@ from keri.vdr import credentialing, verifying, viring
 from keri.vdr.credentialing import Credentialer, proving
 
 DES_ALIASES_SCHEMA="EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
+ECR_SCHEMA = 'EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw'
+LEI = "254900OPPU84GM83MG36"
+LEI_SCHEMA = "ENPXp1vQzRF6JwIuS-mp2U8Uf1MoADoP_GqQ62VsDZWY"
+QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
 
 @pytest.fixture
 def setup_habs():
@@ -183,7 +187,7 @@ def setup_habs():
         
         yield hby, hab, wesHby, wesHab
 
-def da_cred():
+def get_da_cred(issuer, schema, registry):
     """
     Generate test credential from with Habitat as issuer
 
@@ -225,12 +229,132 @@ def da_cred():
         sad=r_sad, code=coring.MtrDex.Blake3_256, label=scheming.Saids.d
     )
 
-    return attrs, rules
+    creder = proving.credential(
+        issuer=issuer,
+        schema=schema,
+        data=attrs,
+        rules=rules,
+        status=registry.regk,
+    )
 
+    return creder   
 
-def setup_rgy(hby, hab, reg_name="cam"):
+def get_ecr_auth_cred(qvi_dig):
+    ecr_auth = dict(
+        d="",
+        auth=dict(
+            n=f"{qvi_dig}",
+            o="I2I",
+            s="EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g"
+        )
+    )
+  
+    _, sad = coring.Saider.saidify(sad=ecr_auth, label=coring.Saids.d)
+  
+    return ecr_auth
+
+def get_ecr_cred(issuer, recipient, schema, registry, sedge):
+    
+    ecr = dict(
+        d="",
+        # n="Q8rNaKITBLLA96Euh5M5v4o3fRl1Bc54xdM-bOIHUjY",
+        personLegalName="Bank User",
+        engagementContextRole="EBA Data Submitter",
+        LEI=f"{LEI}"
+    )
+
+    _, sad = coring.Saider.saidify(sad=ecr, label=coring.Saids.d)
+    
+    r_sad = dict(
+        d = "",
+        usageDisclaimer = {
+            "l": "Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled."
+        },
+        issuanceDisclaimer = {
+            "l": "All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework."
+        },
+        privacyDisclaimer = {
+            "l": "It is the sole responsibility of Holders as Issuees of an ECR vLEI Credential to present that Credential in a privacy-preserving manner using the mechanisms provided in the Issuance and Presentation Exchange (IPEX) protocol specification and the Authentic Chained Data Container (ACDC) specification. https://github.com/WebOfTrust/IETF-IPEX and https://github.com/trustoverip/tswg-acdc-specification."
+        }
+    )
+    _, rules = coring.Saider.saidify(sad=r_sad, label=coring.Saids.d)
+
+    cred = proving.credential(schema=schema,
+                                issuer=issuer,
+                                recipient=recipient,
+                                private=True,
+                                data=ecr,
+                                rules=rules,
+                                source=sedge,
+                                status=registry.regk)
+    # paths = [[], ["a"], ["a", "personal"]]
+
+    return cred
+
+def get_lei_cred(issuer, recipient, schema, registry, sedge):
+    
+    lei = dict(
+        d="",
+        LEI=f"{LEI}"
+    )
+
+    _, sad = coring.Saider.saidify(sad=lei, label=coring.Saids.d)
+    
+    r_sad = dict(
+        d = "",
+        usageDisclaimer = {
+            "l": "Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled."
+        },
+        issuanceDisclaimer = {
+            "l": "All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework."
+        }
+    )
+    _, rules = coring.Saider.saidify(sad=r_sad, label=coring.Saids.d)
+
+    cred = proving.credential(schema=schema,
+                                issuer=issuer,
+                                recipient=recipient,
+                                private=True,
+                                data=lei,
+                                rules=rules,
+                                source=sedge,
+                                status=registry.regk)
+    # paths = [[], ["a"], ["a", "personal"]]
+
+    return cred
+
+def get_qvi_cred(issuer, recipient, schema, registry):
+    
+    qvi = dict(
+        d="",
+        LEI=f"{LEI}"
+    )
+
+    _, sad = coring.Saider.saidify(sad=qvi, label=coring.Saids.d)
+    
+    r_sad = dict(
+        d = "",
+        usageDisclaimer = {
+            "l": "Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled."
+        },
+        issuanceDisclaimer = {
+            "l": "All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework."
+        }
+    )
+    _, rules = coring.Saider.saidify(sad=r_sad, label=coring.Saids.d)
+
+    cred = proving.credential(schema=schema,
+                                issuer=issuer,
+                                recipient=recipient,
+                                data=qvi,
+                                status=registry.regk)
+    # paths = [[], ["a"], ["a", "personal"]]
+
+    return cred
+
+def setup_rgy(hby, hab, reg_name):
     # setup issuer with defaults for allowBackers, backers and estOnly
-    regery = credentialing.Regery(hby=hby, name=reg_name)
+    regery = credentialing.Regery(hby=hby, name=reg_name, temp=True)
     # registry = regery.registryByName(name=reg_name)
     # if registry is None:
     registry = regery.makeRegistry(prefix=hab.pre, name=reg_name, noBackers=True)
@@ -305,19 +429,11 @@ def setup_verifier(hby, hab, regery, registry, reg_anc):
     regery.processEscrows()
     assert registry.regk in regery.reger.tevers
 
-    return verifier, seqner
+    return regery, verifier, seqner
 
 
-def setup_cred(hab, registry, verifier: verifying.Verifier, seqner):
-    attrs, rules = da_cred()
+def setup_cred(hab, registry, verifier: verifying.Verifier, creder, seqner):
 
-    creder = proving.credential(
-        issuer=hab.pre,
-        schema=DES_ALIASES_SCHEMA,
-        data=attrs,
-        rules=rules,
-        status=registry.regk,
-    )
     sadsigers, sadcigars = signing.signPaths(hab=hab, serder=creder, paths=[[]])
     prefixer = hab.kever.prefixer
     missing = False
@@ -368,22 +484,26 @@ def revoke_cred(hab, regery, registry: credentialing.Registry, creder):
         raise kering.ValidationError(f"credential {creder.said} not is correct state for revocation")
 
 
-def issue_desig_aliases(seeder, hby, hab, registryName="cam"):
+def reg_and_verf(seeder, hby, hab, schema, registryName):
     seeder.seedSchema(db=hby.db)
 
     # kli vc registry incept --name "$alias" --alias "$alias" --registry-name "$reg_name"
     regery, registry, reg_anc = setup_rgy(hby, hab, registryName)
-    regery.reger.schms.rem(keys=DES_ALIASES_SCHEMA.encode("utf-8"))
-    verifier, seqner = setup_verifier(hby, hab, regery, registry, reg_anc)
+    regery.reger.schms.rem(keys=schema.encode("utf-8"))
+    regery, verifier, seqner = setup_verifier(hby, hab, regery, registry, reg_anc)
+    
+    return regery, registry, verifier, seqner
+
+def create_and_issue(hby, hab, regery, registry, verifier, schema, creder, seqner):
 
     # kli vc create --name "$alias" --alias "$alias" --registry-name "$reg_name" --schema "${d_alias_schema}" --credential @desig-aliases-public.json
-    creder = setup_cred(hab, registry, verifier, seqner)
+    creder = setup_cred(hab, registry, verifier, creder, seqner)
 
     issue_cred(hab, regery, registry, creder)
     verifier.processEscrows()
 
     saids = regery.reger.issus.get(keys=hab.pre)
-    scads = regery.reger.schms.get(keys=DES_ALIASES_SCHEMA)
+    scads = regery.reger.schms.get(keys=schema)
     assert len(scads) == 1
 
     return Credentialer(hby, regery, None, verifier)
@@ -457,7 +577,7 @@ def genAcdcCesr(hby, aid, creder, prefixer, seqner, saider, msgs: bytearray):
     msgs.extend(cmsg)
 
 @staticmethod
-def genCred(reger, aid: str, schema: str):
+def genCredAnchor(reger, aid: str, schema: str):
     # rgy = credentialing.Regery(hby=hby, name=hby.name, base=hby.base)
     saids = reger.issus.get(keys=aid)
     scads = reger.schms.get(keys=schema.encode("utf-8"))
