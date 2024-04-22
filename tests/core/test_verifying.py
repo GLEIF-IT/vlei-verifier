@@ -19,8 +19,10 @@ from verifier.core import verifying, basing
 def test_setup_verifying(seeder):
     with habbing.openHab(name="verifier1", salt=b'0123456789abcdefg', temp=True) as (hby,hab), \
         habbing.openHab(name="holder1", salt=b'123456789abcdef01', temp=True) as (holdhby, holdhab):
+        seeder.seedSchema(db=holdhby.db)
+        seeder.seedSchema(db=hby.db)
         
-        regery, registry, verifier, seqner = reg_and_verf(seeder, hby, hab, schema=DES_ALIASES_SCHEMA, registryName="daliases")
+        regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="daliases")
         creder = get_da_cred(issuer=hab.pre, schema=DES_ALIASES_SCHEMA, registry=registry)
         
         # this is not a vLEI ECR cred on purpose
@@ -62,17 +64,16 @@ def test_setup_verifying(seeder):
 def test_ecr(seeder):        
     with (habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab),
           habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
-        
-        regery, registry, verifier, seqner = reg_and_verf(seeder, hby, hab, schema=QVI_SCHEMA, registryName="qvissuer")
+        seeder.seedSchema(db=hby.db)
+        regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
         qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=QVI_SCHEMA, registry=registry)
-        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, QVI_SCHEMA, qvicred, seqner)
+        hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, QVI_SCHEMA, qvicred, seqner)
         
-        # qviedge = [
-        #     qvi_edge()
-        # ]
-        
-        # lei_cred(issuer=hab.pre, recipient=hab.pre, schema=LEI_SCHEMA, registry=registry, sedge=sedge)
-        # regery, registry, verifier, seqner = reg_and_verf(seeder, hby, hab, schema=LEI_SCHEMA, registryName="qvissuer")
+        qviedge = get_qvi_edge(qvicred.sad["d"], QVI_SCHEMA)
+
+        # lregery, lregistry, lverifier, lseqner = reg_and_verf(hby, hab, registryName="leireg")        
+        leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=LEI_SCHEMA, registry=registry, sedge=qviedge)
+        hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, LEI_SCHEMA, leicred, seqner)
         
         # #chained ecr auth cred
         # authedge = [
@@ -83,19 +84,19 @@ def test_ecr(seeder):
         
         app = falcon.App()
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-        verifying.setup(app=app, hby=hby, vdb=vdb, reger=crdntler.rgy.reger)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=lcrdntler.rgy.reger)
 
         issAndCred = bytearray()
         # issAndCred.extend(kmsgs)
         # issAndCred.extend(tmsgs)
         # issAndCred.extend(imsgs)
-        issAndCred.extend(acdcmsgs)
+        issAndCred.extend(leimsgs)
         acdc = issAndCred.decode("utf-8")
 
         # Create a test client
         client = falcon.testing.TestClient(app)
         # Define the said and the credential
-        result = client.simulate_put(f'/presentations/{said}',
+        result = client.simulate_put(f'/presentations/{lsaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_202
@@ -106,10 +107,10 @@ def test_ecr(seeder):
         # authorization should fail since authorization steps
         # haven't been completed yet.
         result = client.simulate_get(f'/authorizations/{hab.pre}')
-        assert result.status == falcon.HTTP_403
+        assert result.status == falcon.HTTP_202
         
         result = client.simulate_post(f'/request/verify/{hab.pre}')
-        assert result.status == falcon.HTTP_403
+        assert result.status == falcon.HTTP_202
 
 
 def get_cred(hby, hab, regery, registry, verifier, schema, creder, seqner):

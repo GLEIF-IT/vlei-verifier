@@ -283,59 +283,178 @@ class DbSeed:
             "$schema": "http://json-schema.org/draft-07/schema#",
             "title": "Legal Entity vLEI Credential",
             "description": "A vLEI Credential issued by a Qualified vLEI issuer to a Legal Entity",
+            "type": "object",
             "credentialType": "LegalEntityvLEICredential",
+            "version": "1.0.0",
             "properties": {
-                "v": {"type": "string"},
-                "d": {"type": "string"},
-                "i": {"type": "string"},
-                "ri": {"description": "credential status registry", "type": "string"},
-                "s": {"description": "schema SAID", "type": "string"},
+                "v": {
+                "description": "Version",
+                "type": "string"
+                },
+                "d": {
+                "description": "Credential SAID",
+                "type": "string"
+                },
+                "u": {
+                "description": "One time use nonce",
+                "type": "string"
+                },
+                "i": {
+                "description": "QVI Issuer AID",
+                "type": "string"
+                },
+                "ri": {
+                "description": "Credential status registry",
+                "type": "string"
+                },
+                "s": {
+                "description": "Schema SAID",
+                "type": "string"
+                },
                 "a": {
-                    "description": "data block",
+                "oneOf": [
+                    {
+                    "description": "Attributes block SAID",
+                    "type": "string"
+                    },
+                    {
+                    "$id": "EJ6bFDLrv50bHmIDg-MSummpvYWsPa9CFygPUZyHoESj",
+                    "description": "Attributes block",
+                    "type": "object",
                     "properties": {
-                        "d": {"type": "string"},
-                        "i": {"type": "string"},
-                        "dt": {
-                            "description": "issuance date " "time",
-                            "format": "date-time",
-                            "type": "string",
+                        "d": {
+                        "description": "Attributes block SAID",
+                        "type": "string"
                         },
-                        "LEI": {"type": "string"},
+                        "i": {
+                        "description": "LE Issuer AID",
+                        "type": "string"
+                        },
+                        "dt": {
+                        "description": "issuance date time",
+                        "type": "string",
+                        "format": "date-time"
+                        },
+                        "LEI": {
+                        "description": "LE Issuer AID",
+                        "type": "string",
+                        "format": "ISO 17442"
+                        }
                     },
                     "additionalProperties": False,
-                    "required": ["i", "dt", "LEI"],
-                    "type": "object",
+                    "required": [
+                        "i",
+                        "dt",
+                        "LEI"
+                    ]
+                    }
+                ]
                 },
                 "e": {
-                    "description": "edges block",
+                "oneOf": [
+                    {
+                    "description": "Edges block SAID",
+                    "type": "string"
+                    },
+                    {
+                    "$id": "EDh9sp5cPk0-yo5sFMo6WJS1HMBYIOYCwJrnPvNaH1vI",
+                    "description": "Edges block",
+                    "type": "object",
                     "properties": {
-                        "d": {"description": "SAID of edges block", "type": "string"},
-                        "qualifiedvLEIIssuervLEICredential": {
-                            "description": "node SAID of issuer credential",
-                            "properties": {"n": {"type": "string"}},
-                            "additionalProperties": False,
-                            "required": ["n"],
-                            "type": "object",
+                        "d": {
+                        "description": "Edges block SAID",
+                        "type": "string"
                         },
+                        "qvi": {
+                        "description": "QVI node",
+                        "type": "object",
+                        "properties": {
+                            "n": {
+                            "description": "Issuer credential SAID",
+                            "type": "string"
+                            },
+                            "s": {
+                            "description": "SAID of required schema of the credential pointed to by this node",
+                            "type": "string",
+                            "const": "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
+                            }
+                        },
+                        "additionalProperties": False,
+                        "required": [
+                            "n",
+                            "s"
+                        ]
+                        }
                     },
                     "additionalProperties": False,
-                    "required": ["d", "qualifiedvLEIIssuervLEICredential"],
-                    "type": "object",
+                    "required": [
+                        "d",
+                        "qvi"
+                    ]
+                    }
+                ]
                 },
                 "r": {
-                    "type": "array",
-                    "items": {"type": "object"},
-                    "description": "rules block",
-                    "minItems": 0,
-                },
+                "oneOf": [
+                    {
+                    "description": "Rules block SAID",
+                    "type": "string"
+                    },
+                    {
+                    "$id": "ECllqarpkZrSIWCb97XlMpEZZH3q4kc--FQ9mbkFMb_5",
+                    "description": "Rules block",
+                    "type": "object",
+                    "properties": {
+                        "d": {
+                        "description": "Rules block SAID",
+                        "type": "string"
+                        },
+                        "usageDisclaimer": {
+                        "description": "Usage Disclaimer",
+                        "type": "object",
+                        "properties": {
+                            "l": {
+                            "description": "Associated legal language",
+                            "type": "string",
+                            "const": "Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled."
+                            }
+                        }
+                        },
+                        "issuanceDisclaimer": {
+                        "description": "Issuance Disclaimer",
+                        "type": "object",
+                        "properties": {
+                            "l": {
+                            "description": "Associated legal language",
+                            "type": "string",
+                            "const": "All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework."
+                            }
+                        }
+                        }
+                    },
+                    "additionalProperties": False,
+                    "required": [
+                        "d",
+                        "usageDisclaimer",
+                        "issuanceDisclaimer"
+                    ]
+                    }
+                ]
+                }
             },
             "additionalProperties": False,
-            "required": ["i", "ri", "s", "d", "e", "r"],
-            "type": "object",
+            "required": [
+                "i",
+                "ri",
+                "s",
+                "d",
+                "e",
+                "r"
+            ]
         }
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
-        # NEW: ED892b40P_GcESs3wOcc2zFvL_GVi2Ybzp9isNTZKqP0
+        # NEW: EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM
         db.schema.pin(schemer.said, schemer)
 
         # OLD: EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
@@ -748,7 +867,7 @@ class DbSeed:
                             "s": {
                             "description": "SAID of required schema of the credential pointed to by this node",
                             "type": "string",
-                            "const": "ENPXp1vQzRF6JwIuS-mp2U8Uf1MoADoP_GqQ62VsDZWY"
+                            "const": "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
                             }
                         },
                         "additionalProperties": False,
