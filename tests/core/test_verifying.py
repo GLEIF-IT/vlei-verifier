@@ -10,6 +10,7 @@ from keri.vdr import viring
 import pytest
 
 from verifier.core import verifying, basing
+from verifier.core.authorizing import Authorizer, Schema
 
 # @pytest.fixture(autouse=True)
 # def setup():
@@ -23,12 +24,12 @@ def test_setup_verifying(seeder):
         seeder.seedSchema(db=hby.db)
         
         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="daliases")
-        creder = get_da_cred(issuer=hab.pre, schema=DES_ALIASES_SCHEMA, registry=registry)
+        creder = get_da_cred(issuer=hab.pre, schema=Schema.DES_ALIASES_SCHEMA, registry=registry)
         
         # this is not a vLEI ECR cred on purpose
         # the presentation call should still succeed with
         # verifying the credential is well-formed and cryptographically correct
-        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, DES_ALIASES_SCHEMA,creder, seqner)
+        hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.DES_ALIASES_SCHEMA,creder, seqner)
         addDaliasesSchema(hby)
         
         issAndCred = bytearray()
@@ -66,25 +67,25 @@ def test_ecr(seeder):
           habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
-        qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=QVI_SCHEMA, registry=registry)
-        hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, QVI_SCHEMA, qvicred, seqner)
+        qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA, registry=registry)
+        hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA, qvicred, seqner)
         
-        qviedge = get_qvi_edge(qvicred.sad["d"], QVI_SCHEMA)
+        qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA)
 
-        leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=LEI_SCHEMA, registry=registry, sedge=qviedge)
-        hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, LEI_SCHEMA, leicred, seqner)
+        leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.LEI_SCHEMA, registry=registry, sedge=qviedge)
+        hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.LEI_SCHEMA, leicred, seqner)
 
         #chained ecr auth cred
-        eaedge = get_ecr_auth_edge(lsaid,LEI_SCHEMA)
+        eaedge = get_ecr_auth_edge(lsaid,Schema.LEI_SCHEMA)
         
-        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=ECR_AUTH_SCHEMA, registry=registry, sedge=eaedge)
-        hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, ECR_AUTH_SCHEMA, eacred, seqner)
+        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA, registry=registry, sedge=eaedge)
+        hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA, eacred, seqner)
         
         #chained ecr auth cred
-        ecredge = get_ecr_edge(easaid,ECR_AUTH_SCHEMA)
+        ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA)
         
-        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=ECR_SCHEMA, registry=registry, sedge=ecredge)
-        hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, ECR_SCHEMA, ecr, seqner)
+        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge)
+        hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
         
         app = falcon.App()
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
@@ -107,11 +108,11 @@ def test_ecr(seeder):
         
         hby.kevers[hab.pre] = hab.kever
         
-        # cred is not an LEI cred but is verified
-        # authorization should fail since authorization steps
-        # haven't been completed yet.
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI])
+        auth.processPresentations()
+        
         result = client.simulate_get(f'/authorizations/{hab.pre}')
-        assert result.status == falcon.HTTP_202
+        assert result.status == falcon.HTTP_OK
         
         result = client.simulate_post(f'/request/verify/{hab.pre}')
         assert result.status == falcon.HTTP_202

@@ -19,7 +19,11 @@ EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Data Submitter"
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
 class Schema:
-    ECR_SCHEMA_SAID = "EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw"
+    DES_ALIASES_SCHEMA="EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
+    ECR_AUTH_SCHEMA = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
+    ECR_SCHEMA = 'EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP'
+    LEI_SCHEMA = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
+    QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
 
 
 def setup(hby, vdb, reger, cf):
@@ -101,7 +105,7 @@ class Authorizer:
                 self.vdb.iss.rem(keys=(said,))
                 creder = self.reger.creds.get(keys=(said,))
                 match creder.schema:
-                    case Schema.ECR_SCHEMA_SAID:
+                    case Schema.ECR_SCHEMA:
                         self.processEcr(creder)
                     case _:
                         print(f"invalid credential presentation, schema {creder.schema}")
@@ -117,25 +121,25 @@ class Authorizer:
             creder (Creder):  Serializable credential object
 
         """
-        if creder.subject["i"] not in self.hby.kevers:
+        if creder.issuer not in self.hby.kevers:
             print(f"unknown presenter {creder.subject['i']}")
             return
 
-        kever = self.hby.kevers[creder.subject["i"]]
+        kever = self.hby.kevers[creder.issuer]
 
-        LEI = creder.subject["LEI"]
+        LEI = creder.attrib["LEI"]
         if LEI not in self.leis:
             print(f"LEI: {LEI} not allowed")
             return
 
-        role = creder.subject["engagementContextRole"]
+        role = creder.attrib["engagementContextRole"]
 
         if role not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
             print(f"{role} in not a valid submitter role")
             return
 
         print("Successful authentication, storing user.")
-        self.vdb.accts.pin(keys=(kever.serder.pre,), val=creder.saider)
+        self.vdb.accts.pin(keys=(kever.serder.pre,), val=coring.Saider(qb64=creder.said))
 
     def processRevocations(self):
         """ Loop over database of credential revocations.

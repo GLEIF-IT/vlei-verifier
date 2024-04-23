@@ -12,6 +12,8 @@ import multicommand
 import pytest
 from hio.base import doing
 
+from verifier.core.authorizing import Schema
+
 from keri import kering
 from keri.core import scheming, coring, routing, eventing, parsing
 from keri.db import basing
@@ -29,12 +31,7 @@ WitnessUrls = {
     "wil:http": "http://127.0.0.1:5643/",
 }
 
-DES_ALIASES_SCHEMA="EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
-ECR_AUTH_SCHEMA = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
-ECR_SCHEMA = 'EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP'
 LEI = "254900OPPU84GM83MG36"
-LEI_SCHEMA = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
-QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
 
 @pytest.fixture()
 def mockHelpingNowUTC(monkeypatch):
@@ -461,7 +458,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM
-        assert schemer.said == LEI_SCHEMA
+        assert schemer.said == Schema.LEI_SCHEMA
         db.schema.pin(schemer.said, schemer)
 
         # OLD: EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
@@ -506,7 +503,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs
-        assert schemer.said == QVI_SCHEMA
+        assert schemer.said == Schema.QVI_SCHEMA
         db.schema.pin(schemer.said, schemer)
 
         sad = {
@@ -719,7 +716,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5
-        assert schemer.said == DES_ALIASES_SCHEMA
+        assert schemer.said == Schema.DES_ALIASES_SCHEMA
         db.schema.pin(schemer.said, schemer)
         
         sad = {
@@ -834,7 +831,7 @@ class DbSeed:
                             "s": {
                             "description": "SAID of required schema of the credential pointed to by this node",
                             "type": "string",
-                            "const": f"{ECR_AUTH_SCHEMA}"
+                            "const": f"{Schema.ECR_AUTH_SCHEMA}"
                             },
                             "o": {
                             "description": "Operator indicating this node is the issuer",
@@ -971,7 +968,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EPhh9YQUM1vuIpjvxFCb9pS7lq3YjQRRWtQ4xUiEcPNV
-        assert schemer.said == ECR_SCHEMA
+        assert schemer.said == Schema.ECR_SCHEMA
         db.schema.pin(schemer.said, schemer)
         
         sad = {
@@ -1179,7 +1176,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy
-        assert schemer.said == ECR_AUTH_SCHEMA
+        assert schemer.said == Schema.ECR_AUTH_SCHEMA
         db.schema.pin(schemer.said, schemer)
 
 class Helpers:
