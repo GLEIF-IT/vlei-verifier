@@ -244,7 +244,7 @@ class RequestVerifierResourceEnd:
 
         """
         data = req.params.get("data")
-        sig = req.params.get("sig")
+        sign = req.params.get("sig")
 
         if aid not in self.hby.kevers:
             raise falcon.HTTPNotFound(description=f"unknown {aid} used to sign header")
@@ -254,7 +254,7 @@ class RequestVerifierResourceEnd:
 
         kever = self.hby.kevers[aid]
         verfers = kever.verfers
-        cigar = coring.Cigar(qb64=sig)
+        cigar = coring.Cigar(qb64=sign)
 
         if not verfers[0].verify(sig=cigar.raw, ser=data.encode("utf-8")):
             raise falcon.HTTPUnauthorized(description=f"{aid} provided invalid signature on request data")

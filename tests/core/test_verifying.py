@@ -63,8 +63,8 @@ def test_setup_verifying(seeder):
         assert result.status == falcon.HTTP_403
 
 def test_ecr(seeder):        
-    with (habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab),
-          habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+    with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
+        #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
         qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA, registry=registry)
@@ -113,8 +113,13 @@ def test_ecr(seeder):
         
         result = client.simulate_get(f'/authorizations/{hab.pre}')
         assert result.status == falcon.HTTP_OK
-        
-        result = client.simulate_post(f'/request/verify/{hab.pre}')
+
+        data = 'this is the raw data'
+        raw = b'this is the raw data'
+        cig = hab.sign(ser=raw)[0]
+        assert cig.qb64 == 'AAChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL'
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=data.encode("utf-8"))
+        result = client.simulate_post(f'/request/verify/{hab.pre}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_202
 
 
