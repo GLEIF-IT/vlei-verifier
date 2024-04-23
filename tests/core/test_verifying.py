@@ -71,32 +71,36 @@ def test_ecr(seeder):
         
         qviedge = get_qvi_edge(qvicred.sad["d"], QVI_SCHEMA)
 
-        # lregery, lregistry, lverifier, lseqner = reg_and_verf(hby, hab, registryName="leireg")        
         leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=LEI_SCHEMA, registry=registry, sedge=qviedge)
         hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, LEI_SCHEMA, leicred, seqner)
+
+        #chained ecr auth cred
+        eaedge = get_ecr_auth_edge(lsaid,LEI_SCHEMA)
         
-        # #chained ecr auth cred
-        # authedge = [
-        #     ecr_auth_edge("EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g")
-        # ]
-        # ecr = ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=ECR_SCHEMA, registry=registry, sedge=authedge)
-        # hab, crdntler, said, kmsgs, tmsgs, imsgs, acdcmsgs = get_cred(hby, hab, regery, registry, verifier, ECR_SCHEMA,ecr, seqner)
+        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=ECR_AUTH_SCHEMA, registry=registry, sedge=eaedge)
+        hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, ECR_AUTH_SCHEMA, eacred, seqner)
+        
+        #chained ecr auth cred
+        ecredge = get_ecr_edge(easaid,ECR_AUTH_SCHEMA)
+        
+        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=ECR_SCHEMA, registry=registry, sedge=ecredge)
+        hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, ECR_SCHEMA, ecr, seqner)
         
         app = falcon.App()
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-        verifying.setup(app=app, hby=hby, vdb=vdb, reger=lcrdntler.rgy.reger)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
 
         issAndCred = bytearray()
         # issAndCred.extend(kmsgs)
         # issAndCred.extend(tmsgs)
         # issAndCred.extend(imsgs)
-        issAndCred.extend(leimsgs)
+        issAndCred.extend(ecmsgs)
         acdc = issAndCred.decode("utf-8")
 
         # Create a test client
         client = falcon.testing.TestClient(app)
         # Define the said and the credential
-        result = client.simulate_put(f'/presentations/{lsaid}',
+        result = client.simulate_put(f'/presentations/{ecsaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_202

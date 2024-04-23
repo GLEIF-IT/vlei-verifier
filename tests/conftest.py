@@ -29,6 +29,12 @@ WitnessUrls = {
     "wil:http": "http://127.0.0.1:5643/",
 }
 
+DES_ALIASES_SCHEMA="EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
+ECR_AUTH_SCHEMA = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
+ECR_SCHEMA = 'EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP'
+LEI = "254900OPPU84GM83MG36"
+LEI_SCHEMA = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
+QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
 
 @pytest.fixture()
 def mockHelpingNowUTC(monkeypatch):
@@ -455,6 +461,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM
+        assert schemer.said == LEI_SCHEMA
         db.schema.pin(schemer.said, schemer)
 
         # OLD: EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
@@ -499,6 +506,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs
+        assert schemer.said == QVI_SCHEMA
         db.schema.pin(schemer.said, schemer)
 
         sad = {
@@ -711,6 +719,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5
+        assert schemer.said == DES_ALIASES_SCHEMA
         db.schema.pin(schemer.said, schemer)
         
         sad = {
@@ -825,7 +834,7 @@ class DbSeed:
                             "s": {
                             "description": "SAID of required schema of the credential pointed to by this node",
                             "type": "string",
-                            "const": "EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g"
+                            "const": f"{ECR_AUTH_SCHEMA}"
                             },
                             "o": {
                             "description": "Operator indicating this node is the issuer",
@@ -961,7 +970,216 @@ class DbSeed:
         
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
-        # NEW: EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw
+        # NEW: EPhh9YQUM1vuIpjvxFCb9pS7lq3YjQRRWtQ4xUiEcPNV
+        assert schemer.said == ECR_SCHEMA
+        db.schema.pin(schemer.said, schemer)
+        
+        sad = {
+            "$id": "",
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "ECR Authorization vLEI Credential",
+            "description": "A vLEI Authorization Credential issued by a Legal Entity to a QVI for the authorization of ECR credentials",
+            "type": "object",
+            "credentialType": "ECRAuthorizationvLEICredential",
+            "version": "1.0.0",
+            "properties": {
+                "v": {
+                "description": "Version",
+                "type": "string"
+                },
+                "d": {
+                "description": "Credential SAID",
+                "type": "string"
+                },
+                "u": {
+                "description": "One time use nonce",
+                "type": "string"
+                },
+                "i": {
+                "description": "LE Issuer AID",
+                "type": "string"
+                },
+                "ri": {
+                "description": "Credential status registry",
+                "type": "string"
+                },
+                "s": {
+                "description": "Schema SAID",
+                "type": "string"
+                },
+                "a": {
+                "oneOf": [
+                    {
+                    "description": "Attributes block SAID",
+                    "type": "string"
+                    },
+                    {
+                    "$id": "EBMwtCJt7LUfA9u0jmZ1cAoCavZFIBmZBmlufYeX4gdy",
+                    "description": "Attributes block",
+                    "type": "object",
+                    "properties": {
+                        "d": {
+                        "description": "Attributes block SAID",
+                        "type": "string"
+                        },
+                        "i": {
+                        "description": "QVI Issuee AID",
+                        "type": "string"
+                        },
+                        "dt": {
+                        "description": "Issuance date time",
+                        "type": "string",
+                        "format": "date-time"
+                        },
+                        "AID": {
+                        "description": "AID of the intended recipient of the ECR credential",
+                        "type": "string"
+                        },
+                        "LEI": {
+                        "description": "LEI of the requesting Legal Entity",
+                        "type": "string",
+                        "format": "ISO 17442"
+                        },
+                        "personLegalName": {
+                        "description": "Requested recipient name as provided during identity assurance",
+                        "type": "string"
+                        },
+                        "engagementContextRole": {
+                        "description": "Requested role description i.e. 'Head of Standards'",
+                        "type": "string"
+                        }
+                    },
+                    "additionalProperties": False,
+                    "required": [
+                        "i",
+                        "dt",
+                        "AID",
+                        "LEI",
+                        "personLegalName",
+                        "engagementContextRole"
+                    ]
+                    }
+                ]
+                },
+                "e": {
+                "oneOf": [
+                    {
+                    "description": "Edges block SAID",
+                    "type": "string"
+                    },
+                    {
+                    "$id": "EB6E1GJvVen5NqkKb2TG5jqX66vYOL3md-xkXQqQBySX",
+                    "description": "Edges block",
+                    "type": "object",
+                    "properties": {
+                        "d": {
+                        "description": "Edges block SAID",
+                        "type": "string"
+                        },
+                        "le": {
+                        "description": "Chain to legal entity vLEI credential",
+                        "type": "object",
+                        "properties": {
+                            "n": {
+                            "description": "QVI Issuer credential SAID",
+                            "type": "string"
+                            },
+                            "s": {
+                            "description": "SAID of required schema of the credential pointed to by this node",
+                            "type": "string",
+                            "const": "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
+                            }
+                        },
+                        "additionalProperties": False,
+                        "required": [
+                            "n",
+                            "s"
+                        ]
+                        }
+                    },
+                    "additionalProperties": False,
+                    "required": [
+                        "d",
+                        "le"
+                    ]
+                    }
+                ]
+                },
+                "r": {
+                "oneOf": [
+                    {
+                    "description": "Rules block SAID",
+                    "type": "string"
+                    },
+                    {
+                    "$id": "ELLuSgEW2h8n5fHKLvZc9uTtxzqXQqlWR7MiwEt7AcmM",
+                    "description": "Rules block",
+                    "type": "object",
+                    "properties": {
+                        "d": {
+                        "description": "Rules block SAID",
+                        "type": "string"
+                        },
+                        "usageDisclaimer": {
+                        "description": "Usage Disclaimer",
+                        "type": "object",
+                        "properties": {
+                            "l": {
+                            "description": "Associated legal language",
+                            "type": "string",
+                            "const": "Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled."
+                            }
+                        }
+                        },
+                        "issuanceDisclaimer": {
+                        "description": "Issuance Disclaimer",
+                        "type": "object",
+                        "properties": {
+                            "l": {
+                            "description": "Associated legal language",
+                            "type": "string",
+                            "const": "All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework."
+                            }
+                        }
+                        },
+                        "privacyDisclaimer": {
+                        "description": "Privacy Disclaimer",
+                        "type": "object",
+                        "properties": {
+                            "l": {
+                            "description": "Associated legal language",
+                            "type": "string",
+                            "const": "Privacy Considerations are applicable to QVI ECR AUTH vLEI Credentials.  It is the sole responsibility of QVIs as Issuees of QVI ECR AUTH vLEI Credentials to present these Credentials in a privacy-preserving manner using the mechanisms provided in the Issuance and Presentation Exchange (IPEX) protocol specification and the Authentic Chained Data Container (ACDC) specification.  https://github.com/WebOfTrust/IETF-IPEX and https://github.com/trustoverip/tswg-acdc-specification."
+                            }
+                        }
+                        }
+                    },
+                    "additionalProperties": False,
+                    "required": [
+                        "d",
+                        "usageDisclaimer",
+                        "issuanceDisclaimer",
+                        "privacyDisclaimer"
+                    ]
+                    }
+                ]
+                }
+            },
+            "additionalProperties": False,
+            "required": [
+                "i",
+                "ri",
+                "s",
+                "d",
+                "e",
+                "r"
+            ]
+            }
+            
+        _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
+        schemer = scheming.Schemer(sed=sad)
+        # NEW: EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy
+        assert schemer.said == ECR_AUTH_SCHEMA
         db.schema.pin(schemer.said, schemer)
 
 class Helpers:

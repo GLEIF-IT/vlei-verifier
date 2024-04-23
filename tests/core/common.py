@@ -3,6 +3,8 @@
 import json
 import pytest
 
+from ..conftest import *
+
 from hio.core import http
 from keri.app import habbing, grouping, signing
 from keri.core import coring, eventing, parsing, scheming, serdering
@@ -14,11 +16,7 @@ from keri.peer import exchanging
 from keri.vdr import credentialing, verifying, viring
 from keri.vdr.credentialing import Credentialer, proving
 
-DES_ALIASES_SCHEMA="EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
-ECR_SCHEMA = 'EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw'
 LEI = "254900OPPU84GM83MG36"
-LEI_SCHEMA = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
-QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
 
 @pytest.fixture
 def setup_habs():
@@ -239,31 +237,77 @@ def get_da_cred(issuer, schema, registry):
 
     return creder   
 
-def get_ecr_auth_cred(qvi_dig):
-    ecr_auth = dict(
+def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge):
+    sad = dict(get_ecr_data())
+    sad["AID"]=f'{aid}'
+    
+    _, ecr_auth = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
+
+    r_sad = dict(
+        d = "",
+        usageDisclaimer = {
+            "l": 'Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled.'
+        },
+        issuanceDisclaimer = {
+            "l": 'All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework.'
+        },
+        privacyDisclaimer = {
+            "l": 'Privacy Considerations are applicable to QVI ECR AUTH vLEI Credentials.  It is the sole responsibility of QVIs as Issuees of QVI ECR AUTH vLEI Credentials to present these Credentials in a privacy-preserving manner using the mechanisms provided in the Issuance and Presentation Exchange (IPEX) protocol specification and the Authentic Chained Data Container (ACDC) specification.  https://github.com/WebOfTrust/IETF-IPEX and https://github.com/trustoverip/tswg-acdc-specification.'
+        }
+    )
+    _, rules = coring.Saider.saidify(sad=r_sad, label=coring.Saids.d)
+
+    cred = proving.credential(schema=schema,
+                                issuer=issuer,
+                                recipient=recipient,
+                                private=False,
+                                data=ecr_auth,
+                                rules=rules,
+                                source=sedge,
+                                status=registry.regk)
+    # paths = [[], ["a"], ["a", "personal"]]
+
+    return cred
+    
+def get_ecr_auth_edge(lei_dig, lei_schema):
+    sad = dict(
+        d="",
+        le = dict(
+            n=f"{lei_dig}",
+            s=f"{lei_schema}",
+        )
+    )
+    _, edge = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
+    
+    return edge
+
+def get_ecr_edge(auth_dig, auth_schema):
+    rad = dict(
         d="",
         auth=dict(
-            n=f"{qvi_dig}",
+            n=f"{auth_dig}",
             o="I2I",
-            s="EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g"
+            s=f"{auth_schema}"
         )
     )
   
-    _, sad = coring.Saider.saidify(sad=ecr_auth, label=coring.Saids.d)
+    _, ecr = coring.Saider.saidify(sad=rad, label=coring.Saids.d)
   
-    return ecr_auth
+    return ecr
 
-def get_ecr_cred(issuer, recipient, schema, registry, sedge):
-    
-    ecr = dict(
+def get_ecr_data():
+    return dict(
         d="",
-        # n="Q8rNaKITBLLA96Euh5M5v4o3fRl1Bc54xdM-bOIHUjY",
         personLegalName="Bank User",
         engagementContextRole="EBA Data Submitter",
         LEI=f"{LEI}"
     )
 
-    _, sad = coring.Saider.saidify(sad=ecr, label=coring.Saids.d)
+def get_ecr_cred(issuer, recipient, schema, registry, sedge):
+
+    sad = get_ecr_data()
+
+    _, ecr = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
     
     r_sad = dict(
         d = "",
