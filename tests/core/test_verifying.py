@@ -1,4 +1,4 @@
-from .common import *
+from ..common import *
 
 import falcon
 import falcon.testing
@@ -51,7 +51,7 @@ def test_setup_verifying(seeder):
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_202
         
-        hby.kevers[hab.pre] = hab.kever
+        # hby.kevers[hab.pre] = hab.kever
         
         # cred is not an LEI cred but is verified
         # authorization should fail since authorization steps
@@ -121,29 +121,3 @@ def test_ecr(seeder):
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
         result = client.simulate_post(f'/request/verify/{hab.pre}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_202
-
-
-def get_cred(hby, hab, regery, registry, verifier, schema, creder, seqner):
-
-    crdntler = create_and_issue(hby, hab, regery, registry, verifier, schema, creder, seqner)
-    saiders = crdntler.rgy.reger.schms.get(
-        keys=schema.encode("utf-8"))
-    creds = crdntler.rgy.reger.cloneCreds(saiders,hab.db)
-    
-    print(f"Generating CESR event stream data from hab")
-    kmsgs = bytearray()
-    genKelCesr(hby, hab.pre, kmsgs)
-
-    #add designated aliases TELs and ACDCs
-    creder, prefixer, seqner, saider = genCredAnchor(crdntler.rgy.reger, hab.pre, schema)
-    
-    if creder.regi is not None:
-        tmsgs = bytearray()
-        genTelCesr(crdntler.rgy.reger, creder.regi, tmsgs)
-        imsgs = bytearray()
-        genTelCesr(crdntler.rgy.reger, creder.said, imsgs)
-    acdcmsgs = bytearray()
-    genAcdcCesr(hby, hab.pre, creder, prefixer, seqner, saider, acdcmsgs)
-
-    return hab, crdntler, saiders[0].qb64, kmsgs, tmsgs, imsgs, acdcmsgs
-    # revoke_cred(hab, crdntler.rgy, crdntler.rgy.registryByName("dAliases"), creds[0])

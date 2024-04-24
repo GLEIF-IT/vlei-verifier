@@ -29,19 +29,19 @@ services:
       - PYTHONIOENCODING=UTF-8
     entrypoint: [ "vLEI-server", "-s", "./schema/acdc", "-c" , "./samples/acdc/", "-o", "./samples/oobis/" ]
 
-  # vlei-verifier:
-  #   build:
-  #     context: .
-  #     dockerfile: ./images/verifier.dockerfile
-  #   image: 2byrds/vlei-verifier:latest
-  #   container_name: vlei-verifier
-  #   hostname: vlei-verifier
-  #   depends_on:
-  #     - vlei
-  #     - witnesses
-  #   ports:
-  #     - 7676:7676
-  #   # networks:
-  #   #   - reg
-  #   # volumes:
-  #   #   - './data/keri:/usr/local/var/keri'
+  vlei-verifier:
+    build:
+      context: .
+      dockerfile: ./images/verifier.dockerfile
+    image: 2byrds/vlei-verifier:latest
+    container_name: vlei-verifier
+    hostname: vlei-verifier
+    depends_on:
+      - vlei
+      - witnesses
+    ports:
+      - 7676:7676
+    # networks:
+    #   - reg
+    # volumes:
+    #   - './data/keri:/usr/local/var/keri'
