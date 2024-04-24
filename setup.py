@@ -40,7 +40,7 @@ setup(
     long_description="Verifier: Proof of Concept vLEI Verifier.",
     author='Phil Feairheller',
     author_email='Philip.Feairheller@gleif.org',
-    url='https://github.com/GLEIF-IT/reg-poc-verifier',
+    url='https://github.com/GLEIF-IT/vlei-verifier',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
@@ -64,7 +64,7 @@ setup(
         'Topic :: Utilities',
     ],
     project_urls={
-        'Issue Tracker': 'https://github.com/WebOfTrust/reg-poc-verifier/issues',
+        'Issue Tracker': 'https://github.com/GLEIF-IT/vlei-verifier/issues',
     },
     keywords=[
         "secure attribution",
