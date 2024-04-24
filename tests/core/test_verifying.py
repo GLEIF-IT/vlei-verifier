@@ -115,10 +115,10 @@ def test_ecr(seeder):
         assert result.status == falcon.HTTP_OK
 
         data = 'this is the raw data'
-        raw = b'this is the raw data'
-        cig = hab.sign(ser=raw)[0]
-        assert cig.qb64 == 'AAChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL'
-        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=data.encode("utf-8"))
+        raw = data.encode("utf-8")
+        cig = hab.sign(ser=raw, indexed=False)[0]
+        assert cig.qb64 == '0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL'
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
         result = client.simulate_post(f'/request/verify/{hab.pre}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_202
 
