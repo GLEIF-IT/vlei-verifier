@@ -1,0 +1,133 @@
+from ..common import *
+
+import falcon
+from hio.base import doing
+from hio.core import http
+from keri.app import habbing
+import pytest
+import requests
+import threading
+import time
+import verifier.app.cli.commands.server.start as start
+from verifier.core import verifying, basing
+import verifier.core.authorizing as authorizing
+
+host = "localhost"
+port = 7676
+url = f"http://{host}:{port}"
+
+def test_service_ecr(seeder):        
+    with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
+        #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+        seeder.seedSchema(db=hby.db)
+        regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
+        qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA, registry=registry)
+        hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA, qvicred, seqner)
+        
+        qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA)
+
+        leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.LEI_SCHEMA, registry=registry, sedge=qviedge)
+        hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.LEI_SCHEMA, leicred, seqner)
+
+        #chained ecr auth cred
+        eaedge = get_ecr_auth_edge(lsaid,Schema.LEI_SCHEMA)
+        
+        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA, registry=registry, sedge=eaedge)
+        hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA, eacred, seqner)
+        
+        #chained ecr auth cred
+        ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA)
+        
+        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge)
+        hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
+        
+        app = falcon.App(
+            middleware=falcon.CORSMiddleware(
+                allow_origins='*',
+                allow_credentials='*',
+                expose_headers=['cesr-attachment', 'cesr-date', 'content-type']))
+        vdb = basing.VerifierBaser(name=hby.name, temp=True)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
+        server = http.Server(port=port, app=app)
+        httpServerDoer = http.ServerDoer(server=server)
+        class testCf:
+            def get():
+                return dict(LEIs=[f"{LEI}"])
+        authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=testCf)
+
+        doers = authDoers + [httpServerDoer]
+        limit = 0.25
+        tock = 0.03125
+        doist = doing.Doist(limit=limit, tock=tock)
+        doist.doers = doers
+        doist.enter()
+        assert len(doist.deeds) == 2
+        assert [val[1] for val in doist.deeds] == [0.0, 0.0]  #  retymes
+        # for doer in doers:
+        #     assert doer.baser.opened
+        #     assert "_test/keri/db/test" in doer.baser.path
+        doist.recur()
+
+        issAndCred = bytearray()
+        # issAndCred.extend(kmsgs)
+        # issAndCred.extend(tmsgs)
+        # issAndCred.extend(imsgs)
+        issAndCred.extend(ecmsgs)
+        acdc = issAndCred.decode("utf-8")
+
+        exceptions = []
+        thread = threading.Thread(target=presentation_request,args=(ecsaid, acdc, exceptions))
+        thread.start()
+        time.sleep(3)
+        doist.recur()
+        thread.join()
+        if exceptions:
+            raise exceptions[0]
+        
+        exceptions = []
+        thread = threading.Thread(target=auth_request,args=(hab.pre, exceptions))
+        thread.start()
+        time.sleep(3)
+        doist.recur()
+        thread.join()
+        if exceptions:
+            raise exceptions[0]
+        
+        data = 'this is the raw data'
+        raw = data.encode("utf-8")
+        cig = hab.sign(ser=raw, indexed=False)[0]
+        assert cig.qb64 == '0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL'
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
+       
+        exceptions = []
+        thread = threading.Thread(target=verify_request,args=(hab.pre,raw,cig.qb64,exceptions))
+        thread.start()
+        time.sleep(3)
+        doist.recur()
+        thread.join()
+        if exceptions:
+            raise exceptions[0]
+        
+def presentation_request(said, acdc, exceptions):
+    try:
+        result = requests.put(url=f'{url}/presentations/{said}',
+                            data=acdc,
+                            headers={'Content-Type': 'application/json+cesr'})
+        assert f"{result.status_code} {result.reason}" == falcon.HTTP_202
+    except Exception as e:
+        exceptions.append(e)
+            
+def auth_request(aid, exceptions):
+    try:
+        result = requests.get(url=f'{url}/authorizations/{aid}', headers={"Content-Type": "application/json"})
+        # result = client.simulate_get(f'/authorizations/{hab.pre}')
+        assert f"{result.status_code} {result.reason}" == falcon.HTTP_200
+    except Exception as e:
+        exceptions.append(e)
+    
+def verify_request(aid,data,sig, exceptions):
+    try:
+        result = requests.post(url=f'{url}/request/verify/{aid}',params={'data': data, 'sig': sig})
+        assert f"{result.status_code} {result.reason}" == falcon.HTTP_202
+    except Exception as e:
+        exceptions.append(e)
