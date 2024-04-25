@@ -2,12 +2,11 @@
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
 
-name: GitHub Actions for reg-poc-verifier
+name: GitHub Actions for vlei-verifier
 on:
   push:
     branches:
       - 'main'
-      - 'dev'
   pull_request:
   workflow_dispatch:
 
@@ -17,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-latest, ubuntu-latest ]
+        os: [ macos-13, ubuntu-latest ]
 
     steps:
       - uses: actions/checkout@v3
@@ -25,10 +24,18 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.12.2
+      - name: Install libsodium
+        run: |
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            brew install libsodium
+          else
+            sudo apt-get install -y libsodium-dev
+          fi
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest hio
+          export SODIUM_INSTALL=bundled
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Lint changes
         run: |
@@ -36,7 +43,7 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --ignore=E7,F841,E301,E302,E303 --max-complexity=10 --max-line-length=127 --statistics
-      - name: Run core KERI tests
+      - name: Run core tests
         run: |
           pytest tests/
 
@@ -53,7 +60,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-cov hio
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Run core reg-poc-verifier tests
+      - name: Run core vlei-verifier tests
         run: |
           pytest --cov=./ --cov-report=xml
       - name: Upload

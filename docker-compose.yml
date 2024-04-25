@@ -17,6 +17,12 @@ services:
         - 5643:5643  # witness
         - 5644:5644  # witness
     entrypoint: kli witness demo
+    healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:5642/oobi']
+            interval: 2s
+            timeout: 3s
+            retries: 5
+            start_period: 2s
 
   vlei:
     image: 2byrds/vlei:latest
@@ -28,6 +34,16 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONIOENCODING=UTF-8
     entrypoint: [ "vLEI-server", "-s", "./schema/acdc", "-c" , "./samples/acdc/", "-o", "./samples/oobis/" ]
+    healthcheck:
+            test:
+                - CMD
+                - curl
+                - -f
+                - http://localhost:7723/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
+            interval: 2s
+            timeout: 3s
+            retries: 5
+            start_period: 2s
 
   vlei-verifier:
     build:
@@ -41,7 +57,24 @@ services:
       - witnesses
     ports:
       - 7676:7676
-    # networks:
-    #   - reg
-    # volumes:
-    #   - './data/keri:/usr/local/var/keri'
+    healthcheck:
+            test:
+                - CMD
+                - curl
+                - -f
+                - http://localhost:7676/authorizations/BGj25ISqZ7vw79h6R3o20EHZebS6I6ey5Q0xuAabSveW
+            interval: 2s
+            timeout: 3s
+            retries: 5
+            start_period: 2s
+
+  deps:
+      image: alpine
+      command: ['echo', 'Dependencies running']
+      depends_on:
+          vlei:
+              condition: service_healthy
+          vlei-verifier:
+              condition: service_healthy
+          witnesses:
+              condition: service_healthy

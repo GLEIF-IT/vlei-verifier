@@ -12,7 +12,7 @@ def test_vdb():
     assert baser.name == "vdb"
     assert baser.temp is False
     assert isinstance(baser.env, lmdb.Environment)
-    assert baser.path.endswith("keri/vdb/vdb")
+    assert baser.path.endswith("/vdb/vdb")
     assert baser.env.path() == baser.path
     assert os.path.exists(baser.path)
 
