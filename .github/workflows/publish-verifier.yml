@@ -24,7 +24,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: GLEIF-it/reg-poc-verifier
+          images: GLEIF-it/vlei-verifier
 
 #      - name: Build and push Docker image
 #        uses: docker/build-push-action@v3

@@ -28,7 +28,6 @@ https://caremad.io/posts/2013/07/setup-vs-requirement/
 from glob import glob
 from os.path import basename
 from os.path import splitext
-
 from setuptools import find_packages
 from setuptools import setup
 
@@ -40,7 +39,7 @@ setup(
     long_description="Verifier: Proof of Concept vLEI Verifier.",
     author='Phil Feairheller',
     author_email='Philip.Feairheller@gleif.org',
-    url='https://github.com/GLEIF-IT/reg-poc-verifier',
+    url='https://github.com/GLEIF-IT/vlei-verifier',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
@@ -64,7 +63,7 @@ setup(
         'Topic :: Utilities',
     ],
     project_urls={
-        'Issue Tracker': 'https://github.com/WebOfTrust/reg-poc-verifier/issues',
+        'Issue Tracker': 'https://github.com/GLEIF-IT/vlei-verifier/issues',
     },
     keywords=[
         "secure attribution",
@@ -82,6 +81,7 @@ setup(
         'http_sfv>=0.9.8',
         'dataclasses_json>=0.5.7',
         'apispec>=6.3.0',
+        'requests>=2.31.0',
     ],
     extras_require={
         # eg:
