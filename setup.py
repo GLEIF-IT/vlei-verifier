@@ -28,7 +28,6 @@ https://caremad.io/posts/2013/07/setup-vs-requirement/
 from glob import glob
 from os.path import basename
 from os.path import splitext
-
 from setuptools import find_packages
 from setuptools import setup
 
