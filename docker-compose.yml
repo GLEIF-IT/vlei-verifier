@@ -4,7 +4,7 @@ version: '3.8'
 #   reg:
 
 services:
-  witnesses:
+  witness-demo:
     # container_name: witnesshost
     # hostname: witnesshost
     image: 2byrds/keripy:latest
@@ -18,16 +18,16 @@ services:
         - 5644:5644  # witness
     entrypoint: kli witness demo
     healthcheck:
-            test: ['CMD', 'curl', '-f', 'http://localhost:5642/oobi']
-            interval: 2s
-            timeout: 3s
-            retries: 5
-            start_period: 2s
+      test: ['CMD', 'curl', '-f', 'http://localhost:5642/oobi']
+      interval: 2s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
 
-  vlei:
+  vlei-server:
     image: 2byrds/vlei:latest
-    container_name: vlei
-    hostname: vlei
+    container_name: vlei-server
+    hostname: vlei-server
     ports:
       - 7723:7723
     environment:
@@ -35,15 +35,15 @@ services:
       - PYTHONIOENCODING=UTF-8
     entrypoint: [ "vLEI-server", "-s", "./schema/acdc", "-c" , "./samples/acdc/", "-o", "./samples/oobis/" ]
     healthcheck:
-            test:
-                - CMD
-                - curl
-                - -f
-                - http://localhost:7723/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
-            interval: 2s
-            timeout: 3s
-            retries: 5
-            start_period: 2s
+      test:
+          - CMD
+          - curl
+          - -f
+          - http://localhost:7723/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
+      interval: 2s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
 
   vlei-verifier:
     build:
@@ -53,28 +53,28 @@ services:
     container_name: vlei-verifier
     hostname: vlei-verifier
     depends_on:
-      - vlei
-      - witnesses
+      - vlei-server
+      - witness-demo
     ports:
       - 7676:7676
     healthcheck:
-            test:
-                - CMD
-                - curl
-                - -f
-                - http://localhost:7676/authorizations/BGj25ISqZ7vw79h6R3o20EHZebS6I6ey5Q0xuAabSveW
-            interval: 2s
-            timeout: 3s
-            retries: 5
-            start_period: 2s
+      test:
+          - CMD
+          - curl
+          - -f
+          - http://localhost:7676/health
+      interval: 2s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
 
   deps:
-      image: alpine
-      command: ['echo', 'Dependencies running']
-      depends_on:
-          vlei:
-              condition: service_healthy
-          vlei-verifier:
-              condition: service_healthy
-          witnesses:
-              condition: service_healthy
+    image: alpine
+    command: ['echo', 'Dependencies running']
+    depends_on:
+        vlei-server:
+            condition: service_healthy
+        vlei-verifier:
+            condition: service_healthy
+        witness-demo:
+            condition: service_healthy
