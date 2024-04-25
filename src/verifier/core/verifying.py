@@ -34,6 +34,8 @@ def loadEnds(app, hby, vdb, tvy, vry):
 
     """
 
+    healthEnd = HealthEndpoint()
+    app.add_route("/health", healthEnd)
     presentEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
     app.add_route("/presentations/{said}", presentEnd)
     presentResEnd = AuthorizationResourceEnd(hby, vdb)
@@ -260,3 +262,10 @@ class RequestVerifierResourceEnd:
             raise falcon.HTTPUnauthorized(description=f"{aid} provided invalid signature on request data")
 
         rep.status = falcon.HTTP_ACCEPTED
+
+class HealthEndpoint:
+    def __init__(self):
+        pass
+    def on_get(self, req, rep):
+        rep.status = falcon.HTTP_OK
+        rep.data = json.dumps(dict(health="vLEI verification service is healthy")).encode("utf-8")
