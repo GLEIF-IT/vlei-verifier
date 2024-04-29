@@ -3,7 +3,7 @@ from ..common import *
 import falcon
 from hio.base import doing
 from hio.core import http
-from keri.app import habbing
+from keri.app import habbing, configing
 import pytest
 import requests
 import threading
@@ -16,9 +16,11 @@ host = "localhost"
 port = 7676
 url = f"http://{host}:{port}"
 
+# cf = configing.Configer(name="verifier-config", headDirPath="scripts", temp=False, reopen=True, clear=False)
+
 def test_service_ecr(seeder):        
     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
-        #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
         qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA, registry=registry)
@@ -77,6 +79,11 @@ def test_service_ecr(seeder):
         # issAndCred.extend(imsgs)
         issAndCred.extend(ecmsgs)
         acdc = issAndCred.decode("utf-8")
+
+        # use this for integration testing debugging sessions
+        # while True:
+        #     time.sleep(1)
+        #     doist.recur()
 
         exceptions = []
         thread = threading.Thread(target=presentation_request,args=(ecsaid, acdc, exceptions))
