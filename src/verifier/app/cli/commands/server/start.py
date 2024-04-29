@@ -9,10 +9,11 @@ import argparse
 
 import falcon
 from hio.core import http
+from keri import help
 from keri.app import keeping, configing, habbing, oobiing
 from keri.app.cli.common import existing
 from keri.vdr import viring
-
+import logging
 from verifier.core import verifying, authorizing, basing, reporting
 
 parser = argparse.ArgumentParser(description='Launch vLEI Verification Service')
@@ -72,6 +73,8 @@ def launch(args):
                             temp=False,
                             reopen=True,
                             clear=False)
+    
+    help.ogler.level = logging.DEBUG
 
     if aeid is None:
         hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf)

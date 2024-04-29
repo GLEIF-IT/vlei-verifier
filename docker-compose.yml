@@ -4,46 +4,30 @@ version: '3.8'
 #   reg:
 
 services:
-  witness-demo:
-    # container_name: witnesshost
-    # hostname: witnesshost
-    image: 2byrds/keripy:latest
-    platform: linux/amd64
-    tty: true
-    volumes:
-      - ./scripts/keri/cf/main/:/keripy/scripts/keri/cf/main/
-    ports:
-        - 5642:5642  # witness
-        - 5643:5643  # witness
-        - 5644:5644  # witness
-    entrypoint: kli witness demo
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:5642/oobi']
-      interval: 2s
-      timeout: 3s
-      retries: 5
-      start_period: 2s
+  # witnesses:
+  #   # container_name: witnesshost
+  #   # hostname: witnesshost
+  #   image: 2byrds/keripy:latest
+  #   platform: linux/amd64
+  #   tty: true
+  #   volumes:
+  #     - ./scripts/keri/cf/main/:/keripy/scripts/keri/cf/main/
+  #   ports:
+  #       - 5642:5642  # witness
+  #       - 5643:5643  # witness
+  #       - 5644:5644  # witness
+  #   entrypoint: kli witness demo
 
-  vlei-server:
-    image: 2byrds/vlei:latest
-    container_name: vlei-server
-    hostname: vlei-server
-    ports:
-      - 7723:7723
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONIOENCODING=UTF-8
-    entrypoint: [ "vLEI-server", "-s", "./schema/acdc", "-c" , "./samples/acdc/", "-o", "./samples/oobis/" ]
-    healthcheck:
-      test:
-          - CMD
-          - curl
-          - -f
-          - http://localhost:7723/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
-      interval: 2s
-      timeout: 3s
-      retries: 5
-      start_period: 2s
+  # vlei:
+  #   image: 2byrds/vlei:latest
+  #   container_name: vlei
+  #   hostname: vlei
+  #   ports:
+  #     - 7723:7723
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - PYTHONIOENCODING=UTF-8
+  #   entrypoint: [ "vLEI-server", "-s", "./schema/acdc", "-c" , "./samples/acdc/", "-o", "./samples/oobis/" ]
 
   vlei-verifier:
     build:
@@ -52,9 +36,9 @@ services:
     image: 2byrds/vlei-verifier:latest
     container_name: vlei-verifier
     hostname: vlei-verifier
-    depends_on:
-      - vlei-server
-      - witness-demo
+    # depends_on:
+    #   - vlei
+    #   - witnesses
     ports:
       - 7676:7676
     healthcheck:
