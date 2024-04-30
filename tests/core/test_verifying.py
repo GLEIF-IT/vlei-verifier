@@ -182,7 +182,8 @@ def test_ecr_missing(seeder):
         result = client.simulate_get(f'/authorizations/{hab.pre}')
         assert result.status == falcon.HTTP_403
 
-        auth_result = client.simulate_get(f'/authorizations/{'EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9'}')
+        unknown_prefix = "bad-id"
+        auth_result = client.simulate_get(f'/authorizations/{unknown_prefix}')
         assert auth_result.status == falcon.HTTP_404
 
         data = 'this is the raw data'
@@ -194,5 +195,5 @@ def test_ecr_missing(seeder):
         result = client.simulate_post(f'/request/verify/{hab.pre}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_403
         
-        result = client.simulate_post(f'/request/verify/{'EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9'}',params={'data': data, 'sig': cig.qb64})
+        result = client.simulate_post(f'/request/verify/{unknown_prefix}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_404
