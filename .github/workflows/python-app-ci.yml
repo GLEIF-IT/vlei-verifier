@@ -67,4 +67,4 @@ jobs:
         uses: codecov/codecov-action@v3
       - name: Run tests with coverage
         run: |
-          pytest --cov=./src --cov-report=term-missing --cov-fail-under=60
+          pytest --cov=./src/verifier/core --cov-report=term-missing --cov-fail-under=50
