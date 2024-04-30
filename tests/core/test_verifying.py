@@ -167,6 +167,8 @@ def test_ecr_missing(seeder):
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_400
 
+        issAndCred.extend(eamsgs)
+        acdc = issAndCred.decode("utf-8")
         result = client.simulate_put(f'/presentations/{easaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json'})
@@ -180,7 +182,7 @@ def test_ecr_missing(seeder):
         result = client.simulate_get(f'/authorizations/{hab.pre}')
         assert result.status == falcon.HTTP_403
 
-        auth_result = client.simulate_get(f'/authorizations/{hby}')
+        auth_result = client.simulate_get(f'/authorizations/{'EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9'}')
         assert auth_result.status == falcon.HTTP_404
 
         data = 'this is the raw data'
