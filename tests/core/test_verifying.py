@@ -142,7 +142,6 @@ def test_ecr_missing(seeder):
         
         eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA, registry=registry, sedge=eaedge)
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA, eacred, seqner)
-        print("openhab", easaid, qsaid)
         #chained ecr auth cred
         # ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA)
         
