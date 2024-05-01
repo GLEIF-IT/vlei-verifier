@@ -54,7 +54,7 @@ def test_service_ecr(seeder):
         httpServerDoer = http.ServerDoer(server=server)
         class testCf:
             def get():
-                return dict(LEIs=[f"{LEI}"])
+                return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
         authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=testCf)
 
         doers = authDoers + [httpServerDoer]

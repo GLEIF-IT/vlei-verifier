@@ -22,6 +22,7 @@ class Schema:
     DES_ALIASES_SCHEMA="EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
     ECR_AUTH_SCHEMA = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
     ECR_SCHEMA = 'EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP'
+    ECR_SCHEMA_PROD = 'EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw'
     LEI_SCHEMA = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
     QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
 
@@ -105,8 +106,9 @@ class Authorizer:
                 self.vdb.iss.rem(keys=(said,))
                 creder = self.reger.creds.get(keys=(said,))
                 match creder.schema:
-                    case Schema.ECR_SCHEMA:
+                    case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
                         self.processEcr(creder)
+                        break
                     case _:
                         print(f"invalid credential presentation, schema {creder.schema}")
 
@@ -122,10 +124,13 @@ class Authorizer:
 
         """
         if creder.issuer not in self.hby.kevers:
-            print(f"unknown presenter {creder.subject['i']}")
+            print(f"unknown issuer {creder.issuer}")
             return
-
-        kever = self.hby.kevers[creder.issuer]
+        
+        issuee = creder.attrib["i"]
+        if issuee not in self.hby.kevers:
+            print(f"unknown issuee {issuee}")
+            return
 
         LEI = creder.attrib["LEI"]
         if LEI not in self.leis:
@@ -139,7 +144,7 @@ class Authorizer:
             return
 
         print("Successful authentication, storing user.")
-        self.vdb.accts.pin(keys=(kever.serder.pre,), val=coring.Saider(qb64=creder.said))
+        self.vdb.accts.pin(keys=(issuee,), val=coring.Saider(qb64=creder.said))
 
     def processRevocations(self):
         """ Loop over database of credential revocations.
