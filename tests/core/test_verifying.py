@@ -176,7 +176,7 @@ def test_ecr_missing(seeder):
         
         hby.kevers[hab.pre] = hab.kever
         
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
         auth.processPresentations()
         
         result = client.simulate_get(f'/authorizations/{hab.pre}')
