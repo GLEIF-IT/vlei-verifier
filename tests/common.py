@@ -16,7 +16,8 @@ from keri.peer import exchanging
 from keri.vdr import credentialing, verifying, viring
 from keri.vdr.credentialing import Credentialer, proving
 
-LEI = "254900OPPU84GM83MG36"
+LEI1 = "254900OPPU84GM83MG36"
+LEI2 = "875500ELOZEL05BVXV37"
 
 # @pytest.fixture
 # def setup_habs():
@@ -325,7 +326,7 @@ def get_ecr_data():
         d="",
         personLegalName="Bank User",
         engagementContextRole="EBA Data Submitter",
-        LEI=f"{LEI}"
+        LEI=f"{LEI1}"
     )
 
 def get_ecr_cred(issuer, recipient, schema, registry, sedge):
@@ -364,7 +365,7 @@ def get_lei_cred(issuer, recipient, schema, registry, sedge):
     
     lei = dict(
         d="",
-        LEI=f"{LEI}"
+        LEI=f"{LEI1}"
     )
 
     _, sad = coring.Saider.saidify(sad=lei, label=coring.Saids.d)
@@ -395,7 +396,7 @@ def get_qvi_cred(issuer, recipient, schema, registry):
     
     qvi = dict(
         d="",
-        LEI=f"{LEI}"
+        LEI=f"{LEI1}"
     )
 
     _, sad = coring.Saider.saidify(sad=qvi, label=coring.Saids.d)

@@ -31,8 +31,6 @@ WitnessUrls = {
     "wil:http": "http://127.0.0.1:5643/",
 }
 
-LEI = "254900OPPU84GM83MG36"
-
 @pytest.fixture()
 def mockHelpingNowUTC(monkeypatch):
     """
