@@ -81,9 +81,9 @@ def test_service_ecr(seeder):
         acdc = issAndCred.decode("utf-8")
 
         # use this for integration testing debugging sessions
-        while True:
-            time.sleep(1)
-            doist.recur()
+        # while True:
+        #     time.sleep(1)
+        #     doist.recur()
 
         exceptions = []
         thread = threading.Thread(target=presentation_request,args=(ecsaid, acdc, exceptions))
