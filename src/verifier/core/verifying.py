@@ -246,7 +246,13 @@ class RequestVerifierResourceEnd:
 
         """
         data = req.params.get("data")
+        if data is None:
+            raise falcon.HTTPBadRequest(description="request missing data parameter")
+        encoded_data = data.encode("utf-8") #signature is based on encoded data
+        
         sign = req.params.get("sig")
+        if sign is None:
+            raise falcon.HTTPBadRequest(description="request missing sig parameter")
 
         if aid not in self.hby.kevers:
             raise falcon.HTTPNotFound(description=f"unknown {aid} used to sign header")
@@ -258,8 +264,8 @@ class RequestVerifierResourceEnd:
         verfers = kever.verfers
         cigar = coring.Cigar(qb64=sign)
 
-        if not verfers[0].verify(sig=cigar.raw, ser=data.encode("utf-8")):
-            raise falcon.HTTPUnauthorized(description=f"{aid} provided invalid signature on request data")
+        if not verfers[0].verify(sig=cigar.raw, ser=encoded_data):
+            raise falcon.HTTPUnauthorized(description=f"{aid} provided invalid signature on encoding of request data")
 
         rep.status = falcon.HTTP_ACCEPTED
 
