@@ -4,7 +4,6 @@ import falcon
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
 
-
 def setup(app, hby, vdb, reger, local=False):
     """ Set up verifying endpoints to process vLEI credential verifications
 
@@ -36,12 +35,12 @@ def loadEnds(app, hby, vdb, tvy, vry):
 
     healthEnd = HealthEndpoint()
     app.add_route("/health", healthEnd)
-    presentEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
-    app.add_route("/presentations/{said}", presentEnd)
-    presentResEnd = AuthorizationResourceEnd(hby, vdb)
-    app.add_route("/authorizations/{aid}", presentResEnd)
-    requestEnd = RequestVerifierResourceEnd(hby=hby, vdb=vdb)
-    app.add_route("/request/verify/{aid}", requestEnd)
+    credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
+    app.add_route("/presentations/{said}", credEnd)
+    authEnd = AuthorizationResourceEnd(hby, vdb)
+    app.add_route("/authorizations/{aid}", authEnd)
+    verEnd = RequestVerifierResourceEnd(hby=hby, vdb=vdb)
+    app.add_route("/request/verify/{aid}", verEnd)
 
     return []
 
@@ -100,9 +99,12 @@ class PresentationResourceEndpoint:
               description: Credential Presentation accepted
 
         """
+        rep.content_type = "application/json"
 
         if req.content_type not in ("application/json+cesr",):
-            raise falcon.HTTPBadRequest(description=f"invalid content type={req.content_type} for VC presentation")
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg=f"invalid content type={req.content_type} for VC presentation")).encode("utf-8")
+            return
 
         ims = req.bounded_stream.read()
 
@@ -123,7 +125,9 @@ class PresentationResourceEndpoint:
                     break
 
         if not found:
-            raise falcon.HTTPBadRequest(description=f"credential {said} from body of request was not found")
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg=f"credential {said} from body of request was not found")).encode("utf-8")
+            return
 
         print(f"Credential {said} presented.")
 
@@ -133,7 +137,8 @@ class PresentationResourceEndpoint:
         self.vdb.iss.pin(keys=(saider.qb64,), val=now)
 
         rep.status = falcon.HTTP_ACCEPTED
-
+        rep.data = json.dumps(dict(msg=f"{said} is a valid credential ")).encode("utf-8")
+        return
 
 class AuthorizationResourceEnd:
     """ Authroization resource endpoint
@@ -181,20 +186,27 @@ class AuthorizationResourceEnd:
               description: AID has presented an invalid or subsequently revoked credential
 
         """
+        rep.content_type = "application/json"
+        
         if aid not in self.hby.kevers:
-            raise falcon.HTTPNotFound(description=f"unknown AID: {aid}")
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
+            return
 
         if (saider := self.vdb.accts.get(keys=(aid,))) is None:
-            raise falcon.HTTPForbidden(description=f"identifier {aid} has no valid credential for access")
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
+            return
 
         body = dict(
             aid=aid,
-            said=saider.qb64
+            said=saider.qb64,
+            msg="AID presented valid credential"
         )
 
         rep.status = falcon.HTTP_OK
         rep.data = json.dumps(body).encode("utf-8")
-
+        return
 
 class RequestVerifierResourceEnd:
     """ Request Verifier Resource endpoint class
@@ -245,33 +257,55 @@ class RequestVerifierResourceEnd:
               description: provided signature is not valid against values of the request
 
         """
+        rep.content_type = "application/json"
+        
         data = req.params.get("data")
         if data is None:
-            raise falcon.HTTPBadRequest(description="request missing data parameter")
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg="request missing data parameter")).encode("utf-8")
+            return
+
         encoded_data = data.encode("utf-8") #signature is based on encoded data
         
         sign = req.params.get("sig")
         if sign is None:
-            raise falcon.HTTPBadRequest(description="request missing sig parameter")
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg="request missing sig parameter")).encode("utf-8")
+            return
 
         if aid not in self.hby.kevers:
-            raise falcon.HTTPNotFound(description=f"unknown {aid} used to sign header")
+            rep.status = falcon.HTTP_NOT_FOUND
+            rep.data = json.dumps(dict(msg=f"unknown {aid} used to sign header")).encode("utf-8")
+            return
 
         if self.vdb.accts.get(keys=(aid,)) is None:
-            raise falcon.HTTPForbidden(description=f"identifier {aid} has no valid credential for access")
+            rep.status = falcon.HTTP_FORBIDDEN
+            rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
+            return
 
         kever = self.hby.kevers[aid]
         verfers = kever.verfers
-        cigar = coring.Cigar(qb64=sign)
+        try:
+            cigar = coring.Cigar(qb64=sign)
+        except Exception as ex:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg=f"{aid} provided invalid Cigar signature on encoded request data")).encode("utf-8")
+            return
 
         if not verfers[0].verify(sig=cigar.raw, ser=encoded_data):
-            raise falcon.HTTPUnauthorized(description=f"{aid} provided invalid signature on encoding of request data")
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"{aid} signature (Cigar) verification failed on encoding of request data")).encode("utf-8")
+            return
 
         rep.status = falcon.HTTP_ACCEPTED
+        rep.data = json.dumps(dict(msg="Signature Valid")).encode("utf-8")
+        return
 
 class HealthEndpoint:
     def __init__(self):
         pass
     def on_get(self, req, rep):
+        rep.content_type = "application/json"
         rep.status = falcon.HTTP_OK
-        rep.data = json.dumps(dict(health="vLEI verification service is healthy")).encode("utf-8")
+        rep.data = json.dumps(dict(msg="vLEI verification service is healthy")).encode("utf-8")
+        return

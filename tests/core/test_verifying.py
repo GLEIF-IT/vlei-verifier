@@ -57,7 +57,7 @@ def test_setup_verifying(seeder):
         # authorization should fail since authorization steps
         # haven't been completed yet.
         result = client.simulate_get(f'/authorizations/{hab.pre}')
-        assert result.status == falcon.HTTP_403
+        assert result.status == falcon.HTTP_401
         
         data = 'this is the raw data'
         raw = data.encode("utf-8")
@@ -190,11 +190,11 @@ def test_ecr_missing(seeder):
         auth.processPresentations()
         
         result = client.simulate_get(f'/authorizations/{hab.pre}')
-        assert result.status == falcon.HTTP_403
+        assert result.status == falcon.HTTP_401
 
         unknown_prefix = "bad-id"
         auth_result = client.simulate_get(f'/authorizations/{unknown_prefix}')
-        assert auth_result.status == falcon.HTTP_404
+        assert auth_result.status == falcon.HTTP_401
 
         data = 'this is the raw data'
         raw = data.encode("utf-8")

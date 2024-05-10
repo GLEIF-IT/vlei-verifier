@@ -281,7 +281,7 @@ class ReportResourceEnd:
                                                     f" file")
 
         rep.status = falcon.HTTP_202
-
+        rep.data = json.dumps(dict(msg=f"Upload {dig} received from {aid}")).encode("utf-8")
 
 class ReportVerifier(doing.Doer):
     """ Doer (coroutine) capable of processing submitted report files
