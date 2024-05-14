@@ -57,9 +57,13 @@ def test_setup_verifying(seeder):
         # authorization should fail since authorization steps
         # haven't been completed yet.
         result = client.simulate_get(f'/authorizations/{hab.pre}')
-        assert result.status == falcon.HTTP_403
+        assert result.status == falcon.HTTP_401
         
-        result = client.simulate_post(f'/request/verify/{hab.pre}')
+        data = 'this is the raw data'
+        raw = data.encode("utf-8")
+        cig = hab.sign(ser=raw, indexed=False)[0]
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
+        result = client.simulate_post(f'/request/verify/{hab.pre}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_403
 
 def test_ecr(seeder):        
@@ -121,6 +125,12 @@ def test_ecr(seeder):
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
         result = client.simulate_post(f'/request/verify/{hab.pre}',params={'data': data, 'sig': cig.qb64})
         assert result.status == falcon.HTTP_202
+        
+        data = '"@method": GET\n"@path": /verify/header\n"signify-resource": EHYfRWfM6RxYbzyodJ6SwYytlmCCW2gw5V-FsoX5BgGx\n"signify-timestamp": 2024-05-01T19:54:53.571000+00:00\n"@signature-params: (@method @path signify-resource signify-timestamp);created=1714593293;keyid=BOieebDzg4uaqZ2zuRAX1sTiCrD3pgGT3HtxqSEAo05b;alg=ed25519"'
+        raw = data.encode("utf-8")
+        cig = hab.sign(ser=raw, indexed=False)[0]
+        assert cig.qb64 == '0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP'
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
 
 def test_ecr_missing(seeder):        
     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
@@ -180,11 +190,11 @@ def test_ecr_missing(seeder):
         auth.processPresentations()
         
         result = client.simulate_get(f'/authorizations/{hab.pre}')
-        assert result.status == falcon.HTTP_403
+        assert result.status == falcon.HTTP_401
 
         unknown_prefix = "bad-id"
         auth_result = client.simulate_get(f'/authorizations/{unknown_prefix}')
-        assert auth_result.status == falcon.HTTP_404
+        assert auth_result.status == falcon.HTTP_401
 
         data = 'this is the raw data'
         raw = data.encode("utf-8")
