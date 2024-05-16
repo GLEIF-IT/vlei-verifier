@@ -10,7 +10,7 @@ To initiate this service, run the following commands from the root directory of 
 First create the database environment for the service with:
 
 ```
-kli init --name vdb --nopasscode --config-dir scripts --config-file verifier-config.json
+kli init --name vdb --nopasscode --config-dir scripts --config-file verifier-config-rootsid.json
 ```
 
 This requires a running vLEI server and KERI witness network.
@@ -18,7 +18,7 @@ This requires a running vLEI server and KERI witness network.
 The service can be launched from the command-line with:
 
 ```
-verifier server start --config-dir scripts --config-file verifier-config.json
+verifier server start --config-dir scripts --config-file verifier-config-rootsid.json
 ```
 
 * Note there are multiple config files depending on the environment you are running in.
