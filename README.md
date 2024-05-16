@@ -21,6 +21,8 @@ The service can be launched from the command-line with:
 verifier server start --config-dir scripts --config-file verifier-config.json
 ```
 
+* Note there are multiple config files depending on the environment you are running in.
+
 Or from docker-compose with:
 
 ```
