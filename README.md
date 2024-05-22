@@ -54,7 +54,7 @@ with a body that contains the AID and the SAID of the credential.
 ### Webapp
 The web app (UI front-end) uses Signify/KERIA for selecting identifiers and credentials:
 
-See: [reg-pilot-webapp](https://github.com/GLEIF-IT/reg-pilot-webapp)
+See: [reg-poc-webapp](https://github.com/GLEIF-IT/reg-poc-webapp)
 
 ### Server
 The server provides the business layer and abstracts the underlying verification, but for the most part acts as a pass-through that provides the ability to:
@@ -62,5 +62,5 @@ The server provides the business layer and abstracts the underlying verification
 * Upload signed files
 * Check the status of an upload
 
-See: [reg-pilot-server](https://github.com/GLEIF-IT/reg-poc-server)
+See: [reg-poc-server](https://github.com/GLEIF-IT/reg-poc-server)
 
