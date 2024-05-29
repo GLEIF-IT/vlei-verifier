@@ -111,7 +111,8 @@ def test_service_ecr(seeder):
         thread.join()
         if exceptions:
             raise exceptions[0]
-
+        
+# @pytest.mark.manual
 # def test_service_integration(seeder):        
 #     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
 

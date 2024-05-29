@@ -366,6 +366,7 @@ class ReportVerifier(doing.Doer):
 
                         signatures = docInfo["signatures"]
                         signed = []
+                        verfed = []
                         for signature in signatures:
                             try:
                                 file = signature["file"]
@@ -377,9 +378,9 @@ class ReportVerifier(doing.Doer):
 
                                 aid = signature["aid"]
 
-                                # First check to ensure signature if from submitter, otherwise skip
+                                # First check to ensure signature is from submitter, otherwise skip
                                 if aid != stats.submitter:
-                                    continue
+                                    print(f"signature from {aid} does not match submitter {stats.submitter}")
 
                                 # Now ensure we know who this AID is and that we have their key state
                                 if aid not in self.hby.kevers:
@@ -394,6 +395,8 @@ class ReportVerifier(doing.Doer):
                                     siger.verfer = kever.verfers[siger.index]  # assign verfer
                                     if not siger.verfer.verify(siger.raw, ser):  # verify each sig
                                         raise kering.ValidationError(f"signature {siger.index} invalid for {file}")
+                                    
+                                verfed.append(os.path.basename(fullpath))
 
                             except KeyError as e:
                                 raise kering.ValidationError(f"Invalid signature in manifest signature list"
@@ -401,14 +404,14 @@ class ReportVerifier(doing.Doer):
                             except OSError:
                                 raise kering.ValidationError(f"signature element={signature} point to invalid file")
 
-                        diff = set(files) - set(signed)
+                        diff = set(files) - set(verfed)
                         if len(diff) == 0:
                             msg = f"All {len(files)} files in report package have been signed by " \
                                   f"submitter ({stats.submitter})."
                             self.filer.update(diger, ReportStatus.verified, msg)
                             print(msg)
                         else:
-                            msg = f"{len(diff)} files from report package not signed {diff}, {signed}"
+                            msg = f"{len(diff)} files from report package missing valid signed {diff}, {signed}"
                             self.filer.update(diger, ReportStatus.failed, msg)
                             print(msg)
 
