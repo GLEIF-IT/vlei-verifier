@@ -4,14 +4,7 @@ A service to verify cryptographic signatures and credentials created by AIDs and
 ## Architecture
 
 ### Verifier (this service)
-The verifier uses [keripy](https://github.com/WebOfTRust/keripy) for verifying the requests:
-
-To initiate this service, run the following commands from the root directory of this repository.
-First create the database environment for the service with:
-
-```
-kli init --name vdb --nopasscode --config-dir scripts --config-file verifier-config-rootsid.json
-```
+The verifier uses [keripy](https://github.com/WebOfTRust/keripy) for verifying the requests.
 
 This requires a running vLEI server and KERI witness network.
 
@@ -22,6 +15,8 @@ verifier server start --config-dir scripts --config-file verifier-config-rootsid
 ```
 
 * Note there are multiple config files depending on the environment you are running in.
+For example config files, see [here](https://github.com/GLEIF-IT/vlei-verifier/tree/main/scripts/keri/cf). You can use these config files as they are or configure one as needed.
+
 
 Or from docker-compose with:
 
