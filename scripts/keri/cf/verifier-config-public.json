@@ -4,7 +4,11 @@
     "https://witness-dev01.rootsid.cloud/oobi/BHI7yViNOGWd1X0aKMgxLm4dUgbQDYoCFSJM2U8Hb3cx/controller", 
     "https://witness-dev02.rootsid.cloud/oobi/BOUZ4v-vPMP5KyZQP-d_8B30UHI4KWgXczBgWcRJnnYd/controller",
     "https://witness-dev03.rootsid.cloud/oobi/BNY3LWk2BzX8wXmkXuvpYRVSdfynanwKQwD80KOG00VH/controller",
-    "https://demo.wallet.vlei.tech:3902/oobi/EMGlHNZTCsQ0HoSQ-NgyW6SXafNmfkTx4lt8GKWod2UL/agent/EAUSbpAUGDFVuWGILF7SStpcHRTagl6i3TzdrMbqApFC"
+    "https://william.witness.vlei.tech/oobi",
+    "https://wesley.witness.vlei.tech/oobi",
+    "https://whitney.witness.vlei.tech/oobi",
+    "https://wilma.witness.vlei.tech/oobi",
+    "https://wilbur.witness.vlei.tech/oobi"
   ],
   "durls": [
     "http://schemas.rootsid.cloud/oobi/EBNaNu-M9P5cgrnfl2Fvymy4E_jvxxyjb70PRtiANlJy",
