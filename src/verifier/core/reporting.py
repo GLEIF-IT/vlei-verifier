@@ -8,7 +8,7 @@ from dataclasses import asdict
 import falcon
 from hio.base import doing
 from keri import kering
-from keri.core import coring
+from keri.core import coring, Siger
 
 from verifier.core.basing import ReportStats
 
@@ -372,7 +372,7 @@ class ReportVerifier(doing.Doer):
                                 file = signature["file"]
                                 fullpath = os.path.normpath(os.path.join(metaDir, file))
                                 signed.append(os.path.basename(fullpath))
-                                f = open(fullpath, 'r')
+                                f = open(fullpath, 'rb')
                                 ser = f.read()
                                 f.close()
 
@@ -387,7 +387,7 @@ class ReportVerifier(doing.Doer):
                                     raise kering.ValidationError(f"signature from unknown AID {aid}")
 
                                 kever = self.hby.kevers[aid]
-                                sigers = [coring.Siger(qb64=sig) for sig in signature["sigs"]]
+                                sigers = [Siger(qb64=sig) for sig in signature["sigs"]]
                                 if len(sigers) == 0:
                                     raise kering.ValidationError(f"missing signatures on {file}")
 
@@ -395,6 +395,14 @@ class ReportVerifier(doing.Doer):
                                     siger.verfer = kever.verfers[siger.index]  # assign verfer
                                     if not siger.verfer.verify(siger.raw, ser):  # verify each sig
                                         raise kering.ValidationError(f"signature {siger.index} invalid for {file}")
+                                    # if siger.qb64 != "AABDyfoSHNaRH4foKRXVDp9HAGqol_dnUxDr-En-svEV3FHNJ0R7tgIYMRz0lIIdIkqMwGFGj8qUge03uYFMpcQP":
+                                    #     raise kering.ValidationError(f"siger {siger.qb64} invalid")
+                                    # if ser != "templateID,reported\nI_01.01,true\nI_02.03,true\nI_02.04,true\nI_03.01,true\nI_05.00,true\nI_09.01,true\n":
+                                    #     raise kering.ValidationError(f"ser invalid {ser}")
+                                    # if siger.verfer.qb64.endsWith("CaO8u3g8kpwW8F9nxgVAIgE5vzqTrNSDs_Go1zmrJky":
+                                    #     raise kering.ValidationError(f"verfer {siger.verfer.qb64} invalid")
+                                    # if siger.verfer.code != "D":
+                                    #     raise kering.ValidationError(f"verfer code {siger.verfer.code} invalid")
                                     
                                 verfed.append(os.path.basename(fullpath))
 
@@ -403,6 +411,9 @@ class ReportVerifier(doing.Doer):
                                                              f"missing '{e.args[0]}'")
                             except OSError:
                                 raise kering.ValidationError(f"signature element={signature} point to invalid file")
+                            
+                            except Exception as e:
+                                raise kering.ValidationError(f"{e}")
 
                         diff = set(files) - set(verfed)
                         if len(diff) == 0:
