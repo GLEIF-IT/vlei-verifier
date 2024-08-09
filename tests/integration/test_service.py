@@ -150,7 +150,7 @@ def test_service_ecr(seeder):
 #         # class testCf:
 #         #     def get():
 #         #         return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
-#         rootsCf = configing.Configer(name="verifier-config-rootsid.json",
+#         rootsCf = configing.Configer(name="verifier-config-public.json",
 #                             headDirPath="/Users/meenyleeny/VSCode/vlei-verifier/scripts",
 #                             base="",
 #                             temp=False, reopen=True, clear=False)

@@ -45,7 +45,7 @@ def setup(hby, vdb, reger, cf):
         raise kering.ConfigurationError("invalid configuration, no LEIs available to accept")
 
     leis = data.get("LEIs")
-    if not isinstance(leis, list) or len(leis) == 0:
+    if not None and not isinstance(leis, list):
         raise kering.ConfigurationError("invalid configuration, invalid LEIs in configuration")
 
     authorizer = Authorizer(hby, vdb, reger, leis)
@@ -133,7 +133,8 @@ class Authorizer:
             return
 
         LEI = creder.attrib["LEI"]
-        if LEI not in self.leis:
+        # only process LEI filter if LEI list has been configured
+        if len(self.leis) > 0 and LEI not in self.leis:
             print(f"LEI: {LEI} not allowed")
             return
 

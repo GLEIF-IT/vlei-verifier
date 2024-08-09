@@ -126,7 +126,7 @@ class PresentationResourceEndpoint:
 
         if not found:
             rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg=f"credential {said} from body of request was not found")).encode("utf-8")
+            rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
             return
 
         print(f"Credential {said} presented.")
