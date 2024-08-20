@@ -7,7 +7,6 @@ from dataclasses import asdict
 from hashlib import sha256
 
 import falcon
-import multibase
 from hio.base import doing
 from keri import kering
 from keri.core import coring, Siger, MtrDex
