@@ -12,7 +12,7 @@ from keri import kering
 from keri.core import coring, Siger, MtrDex
 
 from verifier.core.basing import ReportStats
-
+from verifier.core.utils import DigerBuilder
 
 # Report Statuses.
 Reportage = namedtuple("Reportage", "accepted verified failed")
@@ -55,13 +55,6 @@ def loadEnds(app, hby, vdb, filer):
     app.add_route("/reports/{aid}/{dig}", reportEnd)
 
 
-def get_non_prefixed_digest(dig):
-    prefix, digest = dig.split("_", 1)
-    if not digest:
-        raise kering.ValidationError(f"Digest ({dig}) must start with prefix")
-    return digest
-
-
 class Filer:
     """ Report status filer
 
@@ -100,10 +93,8 @@ class Filer:
         )
 
         idx = 0
-        non_pref_dig = get_non_prefixed_digest(dig)  # Temporarily remove prefix
-        non_pref_dig = bytes.fromhex(non_pref_dig)
-        diger = coring.Diger(raw=non_pref_dig, code=MtrDex.SHA2_256)
 
+        diger = DigerBuilder.sha256(dig)
         report = b''
         while True:
             chunk = stream.read(4096)
@@ -156,9 +147,7 @@ class Filer:
                         f = open(fullpath, 'rb')
                         file_object = f.read()
                         f.close()
-                        non_pref_dig = get_non_prefixed_digest(digest["dig"])  # Remove prefix
-                        non_pref_dig = bytes.fromhex(non_pref_dig)
-                        tmp_diger = coring.Diger(raw=non_pref_dig, code=MtrDex.SHA2_256)
+                        tmp_diger = DigerBuilder.sha256(digest["dig"])
                         if not tmp_diger.verify(file_object):
                             raise kering.ValidationError(f"Invalid digest for file {fullpath}")
                     except KeyError as e:
@@ -187,9 +176,7 @@ class Filer:
              ReportStats:  Report stats for report with digest dig or None
 
          """
-        non_pref_dig = get_non_prefixed_digest(dig) # Temporarily remove prefix
-        non_pref_dig = bytes.fromhex(non_pref_dig)
-        diger = coring.Diger(raw=non_pref_dig, code=MtrDex.SHA2_256)
+        diger = DigerBuilder.sha256(dig)
         if (stats := self.vdb.stats.get(keys=(diger.qb64,))) is None:
             return None
 
