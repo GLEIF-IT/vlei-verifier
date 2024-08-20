@@ -4,14 +4,15 @@ import tempfile
 import zipfile
 from collections import namedtuple
 from dataclasses import asdict
+from hashlib import sha256
 
 import falcon
 from hio.base import doing
 from keri import kering
-from keri.core import coring, Siger
+from keri.core import coring, Siger, MtrDex
 
 from verifier.core.basing import ReportStats
-
+from verifier.core.utils import DigerBuilder
 
 # Report Statuses.
 Reportage = namedtuple("Reportage", "accepted verified failed")
@@ -92,19 +93,69 @@ class Filer:
         )
 
         idx = 0
+
+        diger = DigerBuilder.sha256(dig)
+        report = b''
         while True:
             chunk = stream.read(4096)
+            report += chunk
             if not chunk:
                 break
-            key = f"{dig}.{idx}".encode("utf-8")
+            key = f"{diger.qb64}.{idx}".encode("utf-8")
             self.vdb.setVal(db=self.vdb.imgs, key=key, val=chunk)
             idx += 1
             stats.size += len(chunk)
 
-        diger = coring.Diger(qb64=dig)
+        if not diger.verify(report):
+            raise kering.ValidationError(f"Report digets({dig} verification failed)")
+
+        with tempfile.TemporaryFile("w+b") as tf:
+            tf.write(report)
+            tf.seek(0)
+            with tempfile.TemporaryDirectory() as tempdirname:
+                z = zipfile.ZipFile(tf)
+                z.extractall(path=tempdirname)
+                manifest = None
+                for root, dirs, _ in os.walk(tempdirname):
+                    if "META-INF" not in dirs or 'reports' not in dirs:
+                        continue
+                    metaDir = os.path.join(root, 'META-INF')
+                    name = os.path.join(root, 'META-INF', 'reports.json')
+                    if not os.path.exists(name):
+                        continue
+                    f = open(name, 'r')
+                    manifest = json.load(f)
+                    if "documentInfo" not in manifest:
+                        raise kering.ValidationError("Invalid manifest file in report package, missing "
+                                                     "'documentInfo")
+                if manifest is None:
+                    raise kering.ValidationError("No manifest in file, invalid signed report package")
+
+                docInfo = manifest["documentInfo"]
+                if "digests" not in docInfo:
+                    raise kering.ValidationError("No digests found in manifest file")
+
+                digests = docInfo["digests"]
+                for digest in digests:
+                    try:
+                        fullpath = os.path.normpath(os.path.join(metaDir, digest["file"]))
+                        f = open(fullpath, 'rb')
+                        file_object = f.read()
+                        f.close()
+                        tmp_diger = DigerBuilder.sha256(digest["dig"])
+                        if not tmp_diger.verify(file_object):
+                            raise kering.ValidationError(f"Invalid digest for file {fullpath}")
+                    except KeyError as e:
+                        raise kering.ValidationError(f"Invalid digest in manifest digest list"
+                                                     f"missing '{e.args[0]}'")
+                    except OSError:
+                        raise kering.ValidationError(f"signature element={digest} point to invalid file")
+                    except Exception as e:
+                        raise kering.ValidationError(f"{e}")
+
         self.vdb.rpts.add(keys=(aid,), val=diger)
         self.vdb.stts.add(keys=(stats.status,), val=diger)
-        self.vdb.stats.pin(keys=(dig,), val=stats)
+        self.vdb.stats.pin(keys=(diger.qb64,), val=stats)
 
     def get(self, dig):
         """ Return report stats for given report.
@@ -116,10 +167,8 @@ class Filer:
              ReportStats:  Report stats for report with digest dig or None
 
          """
-        if (stats := self.vdb.stats.get(keys=(dig,))) is None:
-            return None
-
-        return stats
+        diger = DigerBuilder.sha256(dig)
+        return self.vdb.stats.get(keys=(diger.qb64,))
 
     def getData(self, dig):
         """ Generator that yields image data in 4k chunks for identifier
@@ -141,7 +190,7 @@ class Filer:
         """ Generator that yields Diger values for all reports currently in Accepted status
 
         """
-        for diger in self.vdb.stts.getIter(keys=(ReportStatus.accepted, )):
+        for diger in self.vdb.stts.getIter(keys=(ReportStatus.accepted,)):
             yield diger
 
     def update(self, diger, status, msg=None):
@@ -283,6 +332,7 @@ class ReportResourceEnd:
         rep.status = falcon.HTTP_202
         rep.data = json.dumps(dict(msg=f"Upload {dig} received from {aid}")).encode("utf-8")
 
+
 class ReportVerifier(doing.Doer):
     """ Doer (coroutine) capable of processing submitted report files
 
@@ -293,7 +343,6 @@ class ReportVerifier(doing.Doer):
        3. Finds all digital signatures specified in the report package manifest file.
        4. Verifies the signatures for each file against the contents of the file.
        5. Validates that the submitter has signed all files in the report package.
-
 
     """
 
@@ -403,7 +452,7 @@ class ReportVerifier(doing.Doer):
                                     #     raise kering.ValidationError(f"verfer {siger.verfer.qb64} invalid")
                                     # if siger.verfer.code != "D":
                                     #     raise kering.ValidationError(f"verfer code {siger.verfer.code} invalid")
-                                    
+
                                 verfed.append(os.path.basename(fullpath))
 
                             except KeyError as e:
@@ -411,7 +460,7 @@ class ReportVerifier(doing.Doer):
                                                              f"missing '{e.args[0]}'")
                             except OSError:
                                 raise kering.ValidationError(f"signature element={signature} point to invalid file")
-                            
+
                             except Exception as e:
                                 raise kering.ValidationError(f"{e}")
 
@@ -429,9 +478,3 @@ class ReportVerifier(doing.Doer):
             except (kering.ValidationError, zipfile.BadZipFile) as e:
                 self.filer.update(diger, ReportStatus.failed, e.args[0])
                 print(e.args[0])
-
-
-
-
-
-
