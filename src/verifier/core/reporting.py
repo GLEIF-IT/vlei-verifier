@@ -4,11 +4,13 @@ import tempfile
 import zipfile
 from collections import namedtuple
 from dataclasses import asdict
+from hashlib import sha256
 
 import falcon
+import multibase
 from hio.base import doing
 from keri import kering
-from keri.core import coring, Siger
+from keri.core import coring, Siger, MtrDex
 
 from verifier.core.basing import ReportStats
 
@@ -54,6 +56,13 @@ def loadEnds(app, hby, vdb, filer):
     app.add_route("/reports/{aid}/{dig}", reportEnd)
 
 
+def get_non_prefixed_digest(dig):
+    prefix, digest = dig.split("_", 1)
+    if not digest:
+        raise kering.ValidationError(f"Digest ({dig}) must start with prefix")
+    return digest
+
+
 class Filer:
     """ Report status filer
 
@@ -92,19 +101,82 @@ class Filer:
         )
 
         idx = 0
+        non_pref_dig = get_non_prefixed_digest(dig)  # Temporarily remove prefix
+        non_pref_dig = bytes.fromhex(non_pref_dig)
+        diger = coring.Diger(raw=non_pref_dig, code=MtrDex.SHA2_256)
+
+        report = b''
         while True:
             chunk = stream.read(4096)
+            report += chunk
             if not chunk:
                 break
-            key = f"{dig}.{idx}".encode("utf-8")
+            key = f"{diger.qb64}.{idx}".encode("utf-8")
             self.vdb.setVal(db=self.vdb.imgs, key=key, val=chunk)
             idx += 1
             stats.size += len(chunk)
 
-        diger = coring.Diger(qb64=dig)
+        if not diger.verify(report):
+            raise kering.ValidationError(f"Report digets({dig} verification failed)")
+        with tempfile.TemporaryFile("w+b") as tf:
+            tf.write(report)
+            tf.seek(0)
+            with tempfile.TemporaryDirectory() as tempdirname:
+                z = zipfile.ZipFile(tf)
+                z.extractall(path=tempdirname)
+                manifest = None
+                for root, dirs, _ in os.walk(tempdirname):
+                    if "META-INF" not in dirs or 'reports' not in dirs:
+                        continue
+
+                    metaDir = os.path.join(root, 'META-INF')
+                    name = os.path.join(root, 'META-INF', 'reports.json')
+                    if not os.path.exists(name):
+                        continue
+                    f = open(name, 'r')
+                    manifest = json.load(f)
+                    if "documentInfo" not in manifest:
+                        raise kering.ValidationError("Invalid manifest file in report package, missing "
+                                                     "'documentInfo")
+                    reportsDir = os.path.join(root, 'reports')
+                    files = os.listdir(reportsDir)
+
+                if manifest is None:
+                    raise kering.ValidationError("No manifest in file, invalid signed report package")
+
+                docInfo = manifest["documentInfo"]
+
+                if "digests" not in docInfo:
+                    raise kering.ValidationError("No digests found in manifest file")
+
+                digests = docInfo["digests"]
+                for digest in digests:
+                    try:
+                        file = digest["file"]
+                        fullpath = os.path.normpath(os.path.join(metaDir, file))
+                        f = open(fullpath, 'rb')
+                        file_object = f.read()
+                        f.close()
+                        non_pref_dig = get_non_prefixed_digest(digest["dig"])  # Remove prefix
+                        non_pref_dig = bytes.fromhex(non_pref_dig)
+                        tmp_diger = coring.Diger(raw=non_pref_dig, code=MtrDex.SHA2_256)
+                        if not tmp_diger.verify(file_object):
+                            raise kering.ValidationError(f"Invalid digest for file {fullpath}")
+                    except KeyError as e:
+                        raise kering.ValidationError(f"Invalid digest in manifest digest list"
+                                                     f"missing '{e.args[0]}'")
+                    except OSError:
+                        raise kering.ValidationError(f"signature element={digest} point to invalid file")
+
+                    except Exception as e:
+                        raise kering.ValidationError(f"{e}")
+
+
+
+
         self.vdb.rpts.add(keys=(aid,), val=diger)
         self.vdb.stts.add(keys=(stats.status,), val=diger)
-        self.vdb.stats.pin(keys=(dig,), val=stats)
+        self.vdb.stats.pin(keys=(diger.qb64,), val=stats)
 
     def get(self, dig):
         """ Return report stats for given report.
@@ -116,7 +188,10 @@ class Filer:
              ReportStats:  Report stats for report with digest dig or None
 
          """
-        if (stats := self.vdb.stats.get(keys=(dig,))) is None:
+        non_pref_dig = get_non_prefixed_digest(dig) # Temporarily remove prefix
+        non_pref_dig = bytes.fromhex(non_pref_dig)
+        diger = coring.Diger(raw=non_pref_dig, code=MtrDex.SHA2_256)
+        if (stats := self.vdb.stats.get(keys=(diger.qb64,))) is None:
             return None
 
         return stats
