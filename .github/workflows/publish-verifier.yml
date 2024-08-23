@@ -24,15 +24,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: GLEIF-it/vlei-verifier
+          images: gleif/vlei-verifier
 
-#      - name: Build and push Docker image
-#        uses: docker/build-push-action@v3
-#        with:
-#          context: .
-#          file: images/verifier.dockerfile
-#          push: true
-#          tags: |
-#            WebOfTrust/reg-poc-verifier:${{ github.event.inputs.version }}
-#            WebOfTrust/reg-poc-verifier:latest
-#          labels: ${{ github.event.inputs.version }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+           context: .
+           file: images/verifier.dockerfile
+           push: true
+           tags: |
+             gleif/vlei-verifier:${{ github.event.inputs.version }}
+           labels: ${{ github.event.inputs.version }}
