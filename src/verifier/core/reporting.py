@@ -4,6 +4,7 @@ import tempfile
 import zipfile
 from collections import namedtuple
 from dataclasses import asdict
+from fileinput import filename
 from hashlib import sha256
 
 import falcon
@@ -418,13 +419,6 @@ class ReportVerifier(doing.Doer):
                         verfed = []
                         for signature in signatures:
                             try:
-                                file = signature["file"]
-                                fullpath = os.path.normpath(os.path.join(metaDir, file))
-                                signed.append(os.path.basename(fullpath))
-                                f = open(fullpath, 'rb')
-                                ser = f.read()
-                                f.close()
-
                                 aid = signature["aid"]
 
                                 # First check to ensure signature is from submitter, otherwise skip
@@ -435,23 +429,22 @@ class ReportVerifier(doing.Doer):
                                 if aid not in self.hby.kevers:
                                     raise kering.ValidationError(f"signature from unknown AID {aid}")
 
+                                dig = signature["dig"]
+                                non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
+                                file_name = signature["file"]
+                                fullpath = os.path.normpath(os.path.join(metaDir, file_name))
+                                signed.append(os.path.basename(fullpath))
+
+
                                 kever = self.hby.kevers[aid]
                                 sigers = [Siger(qb64=sig) for sig in signature["sigs"]]
                                 if len(sigers) == 0:
-                                    raise kering.ValidationError(f"missing signatures on {file}")
+                                    raise kering.ValidationError(f"missing signatures on {file_name}")
 
                                 for siger in sigers:
                                     siger.verfer = kever.verfers[siger.index]  # assign verfer
-                                    if not siger.verfer.verify(siger.raw, ser):  # verify each sig
-                                        raise kering.ValidationError(f"signature {siger.index} invalid for {file}")
-                                    # if siger.qb64 != "AABDyfoSHNaRH4foKRXVDp9HAGqol_dnUxDr-En-svEV3FHNJ0R7tgIYMRz0lIIdIkqMwGFGj8qUge03uYFMpcQP":
-                                    #     raise kering.ValidationError(f"siger {siger.qb64} invalid")
-                                    # if ser != "templateID,reported\nI_01.01,true\nI_02.03,true\nI_02.04,true\nI_03.01,true\nI_05.00,true\nI_09.01,true\n":
-                                    #     raise kering.ValidationError(f"ser invalid {ser}")
-                                    # if siger.verfer.qb64.endsWith("CaO8u3g8kpwW8F9nxgVAIgE5vzqTrNSDs_Go1zmrJky":
-                                    #     raise kering.ValidationError(f"verfer {siger.verfer.qb64} invalid")
-                                    # if siger.verfer.code != "D":
-                                    #     raise kering.ValidationError(f"verfer code {siger.verfer.code} invalid")
+                                    if not siger.verfer.verify(siger.raw, bytes(non_prefixed_dig, "utf-8")):  # verify each sig
+                                        raise kering.ValidationError(f"signature {siger.index} invalid for {file_name}")
 
                                 verfed.append(os.path.basename(fullpath))
 
@@ -464,6 +457,7 @@ class ReportVerifier(doing.Doer):
                             except Exception as e:
                                 raise kering.ValidationError(f"{e}")
 
+
                         diff = set(files) - set(verfed)
                         if len(diff) == 0:
                             msg = f"All {len(files)} files in report package have been signed by " \
@@ -474,6 +468,7 @@ class ReportVerifier(doing.Doer):
                             msg = f"{len(diff)} files from report package missing valid signed {diff}, {signed}"
                             self.filer.update(diger, ReportStatus.failed, msg)
                             print(msg)
+
 
             except (kering.ValidationError, zipfile.BadZipFile) as e:
                 self.filer.update(diger, ReportStatus.failed, e.args[0])

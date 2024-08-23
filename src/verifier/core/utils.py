@@ -6,7 +6,7 @@ class DigerBuilder:
     @staticmethod
     def sha256(dig):
         try:
-            non_pref_dig = DigerBuilder._get_non_prefixed_digest(dig)  # Temporarily remove prefix
+            non_pref_dig = DigerBuilder.get_non_prefixed_digest(dig)  # Temporarily remove prefix
             non_pref_dig = bytes.fromhex(non_pref_dig)
             diger = DigerBuilder.build_diger(non_pref_dig, MtrDex.SHA2_256)
             return diger
@@ -14,7 +14,7 @@ class DigerBuilder:
             raise e
 
     @staticmethod
-    def _get_non_prefixed_digest(dig):
+    def get_non_prefixed_digest(dig):
         try:
             prefix, digest = dig.split("_", 1)
         except ValueError:
