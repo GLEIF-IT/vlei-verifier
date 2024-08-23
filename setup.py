@@ -72,9 +72,9 @@ setup(
         "resolver",
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
-    python_requires='>=3.12.0',
+    python_requires='>=3.12.2',
     install_requires=[
-        'keri>=1.2.0-dev10',
+        'keri>=1.2.0.dev13',
         'mnemonic>=0.20',
         'multicommand>=1.0.0',
         'falcon>=3.1.0',

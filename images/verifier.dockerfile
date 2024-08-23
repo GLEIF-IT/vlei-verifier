@@ -1,4 +1,4 @@
-FROM 2byrds/keripy:latest
+FROM weboftrust/keri:1.2.0-dev13
 
 WORKDIR /usr/local/var
 

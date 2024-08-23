@@ -2,7 +2,7 @@ services:
   # witnesses:
   #   # container_name: witnesshost
   #   # hostname: witnesshost
-  #   image: 2byrds/keripy:latest
+  #   image: weboftrust/keri:latest
   #   platform: linux/amd64
   #   tty: true
   #   volumes:
@@ -14,7 +14,7 @@ services:
   #   entrypoint: kli witness demo
 
   # vlei:
-  #   image: 2byrds/vlei:latest
+  #   image: gleif/vlei:latest
   #   container_name: vlei
   #   hostname: vlei
   #   ports:
@@ -28,7 +28,7 @@ services:
     build:
       context: .
       dockerfile: ./images/verifier.dockerfile
-    image: 2byrds/vlei-verifier:latest
+    image: gleif/vlei-verifier:latest
     container_name: vlei-verifier
     hostname: vlei-verifier
     # depends_on:
