@@ -5,14 +5,9 @@ import pytest
 
 from .conftest import *
 
-from hio.core import http
-from keri.app import habbing, grouping, signing
+from keri.app import signing
 from keri.core import coring, eventing, parsing, scheming, serdering
-from keri.db import basing
-from keri.end import ending
-from keri.help import helping
-from keri import help, kering
-from keri.peer import exchanging
+from keri import kering
 from keri.vdr import credentialing, verifying, viring
 from keri.vdr.credentialing import Credentialer, proving
 

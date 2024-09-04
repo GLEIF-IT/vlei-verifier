@@ -3,6 +3,7 @@ import json
 import falcon
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
+from verifier.core.authorizing import Schema
 
 def setup(app, hby, vdb, reger, local=False):
     """ Set up verifying endpoints to process vLEI credential verifications
@@ -116,29 +117,37 @@ class PresentationResourceEndpoint:
                                vry=self.vry)
 
         found = False
+        creds = None
         while self.vry.cues:
             msg = self.vry.cues.popleft()
             if "creder" in msg:
                 creder = msg["creder"]
                 if creder.said == said:
                     found = True
-                    break
+                    saider = coring.Saider(qb64=said)
+                    cred_attrs = creder.sad['a']
+                    if 'i' in cred_attrs:
+                        saids = self.vry.reger.subjs.get(keys=cred_attrs['i'])
+                        creds = self.vry.reger.cloneCreds(saids, self.hby.db)
+                    else:
+                        creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
+                    
 
-        if not found:
-            rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
-            return
+                    print(f"Credential {said} presented.")
 
-        print(f"Credential {said} presented.")
+                    now = coring.Dater()
 
-        saider = coring.Saider(qb64=said)
-        now = coring.Dater()
+                    self.vdb.iss.pin(keys=(saider.qb64,), val=now)
 
-        self.vdb.iss.pin(keys=(saider.qb64,), val=now)
+                    rep.status = falcon.HTTP_ACCEPTED
+                    rep.data = json.dumps(dict(creds=json.dumps(creds),msg=f"{said} is a valid credential ")).encode("utf-8")
+                    return
 
-        rep.status = falcon.HTTP_ACCEPTED
-        rep.data = json.dumps(dict(msg=f"{said} is a valid credential ")).encode("utf-8")
+        rep.status = falcon.HTTP_BAD_REQUEST
+        rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
         return
+
+
 
 class AuthorizationResourceEnd:
     """ Authroization resource endpoint
