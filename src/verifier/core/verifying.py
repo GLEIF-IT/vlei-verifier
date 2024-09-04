@@ -143,8 +143,7 @@ class PresentationResourceEndpoint:
 
                     rep.status = falcon.HTTP_ACCEPTED
                     rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} is a valid credential ", 
-                                               lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i')))
-                                                .encode("utf-8")
+                                               lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode("utf-8")
                     return
 
         rep.status = falcon.HTTP_BAD_REQUEST
