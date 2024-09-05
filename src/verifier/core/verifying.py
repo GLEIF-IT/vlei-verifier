@@ -119,35 +119,37 @@ class PresentationResourceEndpoint:
                                vry=self.vry)
 
         found = False
-        creds = None
+        saids = []
         while self.vry.cues:
             msg = self.vry.cues.popleft()
             if "creder" in msg:
                 creder = msg["creder"]
                 if creder.said == said:
                     found = True
-                    saider = coring.Saider(qb64=said)
-                    cred_attrs = creder.sad['a']
-                    if 'i' in cred_attrs:
-                        saids = self.vry.reger.subjs.get(keys=cred_attrs['i'])
-                        creds = self.vry.reger.cloneCreds(saids, self.hby.db)
-                    else:
-                        creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
+
+        if not found: 
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
+            return
+        
+        saider = coring.Saider(qb64=said)
+        cred_attrs = creder.sad['a']
+        creds = None
+        if 'i' in cred_attrs:
+            saids = self.vry.reger.subjs.get(keys=cred_attrs['i'])
+            creds = self.vry.reger.cloneCreds(saids, self.hby.db)
+        else:
+            creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
                     
+        print(f"Credential {said} presented.")
 
-                    print(f"Credential {said} presented.")
+        now = coring.Dater()
 
-                    now = coring.Dater()
+        self.vdb.iss.pin(keys=(saider.qb64,), val=now)
 
-                    self.vdb.iss.pin(keys=(saider.qb64,), val=now)
-
-                    rep.status = falcon.HTTP_ACCEPTED
-                    rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} is a valid credential ", 
-                                               lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode("utf-8")
-                    return
-
-        rep.status = falcon.HTTP_BAD_REQUEST
-        rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
+        rep.status = falcon.HTTP_ACCEPTED
+        rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} is a valid credential ", 
+                                    lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode("utf-8")
         return
 
 class AuthorizationResourceEnd:
