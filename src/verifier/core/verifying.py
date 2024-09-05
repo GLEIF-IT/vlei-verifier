@@ -3,6 +3,7 @@ import json
 import falcon
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
+from verifier.core.authorizing import Schema
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -118,32 +119,38 @@ class PresentationResourceEndpoint:
                                vry=self.vry)
 
         found = False
+        saids = []
         while self.vry.cues:
             msg = self.vry.cues.popleft()
             if "creder" in msg:
                 creder = msg["creder"]
                 if creder.said == said:
                     found = True
-                    break
 
-        if not found:
+        if not found: 
             rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
             return
-
+        
+        saider = coring.Saider(qb64=said)
+        cred_attrs = creder.sad['a']
+        creds = None
+        if 'i' in cred_attrs:
+            saids = self.vry.reger.subjs.get(keys=cred_attrs['i'])
+            creds = self.vry.reger.cloneCreds(saids, self.hby.db)
+        else:
+            creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
+                    
         print(f"Credential {said} presented.")
 
-        saider = coring.Saider(qb64=said)
         now = coring.Dater()
 
         self.vdb.iss.pin(keys=(saider.qb64,), val=now)
 
         rep.status = falcon.HTTP_ACCEPTED
-        rep.data = json.dumps(
-            dict(msg=f"{said} is a valid credential ", lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode(
-            "utf-8")
+        rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} is a valid credential ", 
+                                    lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode("utf-8")
         return
-
 
 class AuthorizationResourceEnd:
     """ Authroization resource endpoint
