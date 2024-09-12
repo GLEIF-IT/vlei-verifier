@@ -133,24 +133,23 @@ class Filer:
                     raise kering.ValidationError("No manifest in file, invalid signed report package")
 
                 docInfo = manifest["documentInfo"]
-                if "digests" not in docInfo:
-                    raise kering.ValidationError("No digests found in manifest file")
+                if "signatures" not in docInfo:
+                    raise kering.ValidationError("No signatures found in manifest file")
 
-                digests = docInfo["digests"]
-                for digest in digests:
+                signatures = docInfo["signatures"]
+                for signature in signatures:
                     try:
-                        fullpath = os.path.normpath(os.path.join(metaDir, digest["file"]))
+                        fullpath = os.path.normpath(os.path.join(metaDir, signature["file"]))
                         f = open(fullpath, 'rb')
                         file_object = f.read()
                         f.close()
-                        tmp_diger = DigerBuilder.sha256(digest["dig"])
+                        tmp_diger = DigerBuilder.sha256(signature["digest"])
                         if not tmp_diger.verify(file_object):
                             raise kering.ValidationError(f"Invalid digest for file {fullpath}")
                     except KeyError as e:
-                        raise kering.ValidationError(f"Invalid digest in manifest digest list"
-                                                     f"missing '{e.args[0]}'")
+                        raise kering.ValidationError(f"Invalid digest, manifest digest missing '{e.args[0]}'")
                     except OSError:
-                        raise kering.ValidationError(f"signature element={digest} point to invalid file")
+                        raise kering.ValidationError(f"signature element={signature} point to invalid file")
                     except Exception as e:
                         raise kering.ValidationError(f"{e}")
 
@@ -322,13 +321,15 @@ class ReportResourceEnd:
         upload = False
         for part in form:
             if part.name == "upload":
-                self.filer.create(aid=aid, dig=dig, filename=part.secure_filename, typ=part.content_type,
-                                  stream=part.stream)
-                upload = True
+                try:
+                    self.filer.create(aid=aid, dig=dig, filename=part.secure_filename, typ=part.content_type,
+                                    stream=part.stream)
+                    upload = True
+                except Exception as e:
+                    raise falcon.HTTPBadRequest(description=f"{str(e)}")
 
         if not upload:
-            raise falcon.HTTPBadRequest(description=f"content type must be multipart/form-data with an upload"
-                                                    f" file")
+            raise falcon.HTTPBadRequest(description=f"upload file content type must be multipart/form-data")
 
         rep.status = falcon.HTTP_202
         rep.data = json.dumps(dict(msg=f"Upload {dig} received from {aid}")).encode("utf-8")
@@ -429,7 +430,7 @@ class ReportVerifier(doing.Doer):
                                 if aid not in self.hby.kevers:
                                     raise kering.ValidationError(f"signature from unknown AID {aid}")
 
-                                dig = signature["dig"]
+                                dig = signature["digest"]
                                 non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
                                 file_name = signature["file"]
                                 fullpath = os.path.normpath(os.path.join(metaDir, file_name))
@@ -449,8 +450,7 @@ class ReportVerifier(doing.Doer):
                                 verfed.append(os.path.basename(fullpath))
 
                             except KeyError as e:
-                                raise kering.ValidationError(f"Invalid signature in manifest signature list"
-                                                             f"missing '{e.args[0]}'")
+                                raise kering.ValidationError(f"Invalid signature in manifest missing '{e.args[0]}'")
                             except OSError:
                                 raise kering.ValidationError(f"signature element={signature} point to invalid file")
 
