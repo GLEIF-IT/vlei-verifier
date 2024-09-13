@@ -118,7 +118,7 @@ class Filer:
                 z.extractall(path=tempdirname)
                 manifest = None
                 for root, dirs, _ in os.walk(tempdirname):
-                    if "META-INF" not in dirs or 'reports' not in dirs:
+                    if "META-INF" not in dirs:
                         continue
                     metaDir = os.path.join(root, 'META-INF')
                     name = os.path.join(root, 'META-INF', 'reports.json')
@@ -391,7 +391,7 @@ class ReportVerifier(doing.Doer):
                         files = []
                         manifest = None
                         for root, dirs, _ in os.walk(tempdirname):
-                            if "META-INF" not in dirs or 'reports' not in dirs:
+                            if "META-INF" not in dirs:
                                 continue
 
                             metaDir = os.path.join(root, 'META-INF')
@@ -404,8 +404,7 @@ class ReportVerifier(doing.Doer):
                             if "documentInfo" not in manifest:
                                 raise kering.ValidationError("Invalid manifest file in report package, missing "
                                                              "'documentInfo")
-                            reportsDir = os.path.join(root, 'reports')
-                            files = os.listdir(reportsDir)
+                            files = os.listdir(root)
 
                         if manifest is None:
                             raise kering.ValidationError("No manifest in file, invalid signed report package")
