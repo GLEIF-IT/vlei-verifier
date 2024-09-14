@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import tempfile
 import zipfile
@@ -8,6 +9,7 @@ from fileinput import filename
 from hashlib import sha256
 
 import falcon
+from keri import help
 from hio.base import doing
 from keri import kering
 from keri.core import coring, Siger, MtrDex
@@ -15,11 +17,24 @@ from keri.core import coring, Siger, MtrDex
 from verifier.core.basing import ReportStats
 from verifier.core.utils import DigerBuilder
 
+# help.ogler.level = logging.getLevelName("DEBUG")
+# logger = help.ogler.getLogger()
+logger = help.ogler.getLogger("ReportVerifier", level=logging.DEBUG)
+
 # Report Statuses.
 Reportage = namedtuple("Reportage", "accepted verified failed")
 
 # Referencable report status enumeration
 ReportStatus = Reportage(accepted="accepted", verified="verified", failed="failed")
+
+AID = "aid"
+DIGEST = "digests"
+DOC_INFO = "documentInfo"
+FILE = "file"
+META_INF_DIR = "META-INF"
+REPORTS_JSON = "reports.json"
+SIGNATURES = "signatures"
+SIGS = "sigs"
 
 
 def setup(app, hby, vdb):
@@ -70,6 +85,7 @@ class Filer:
             vdb (VerifierBaser): verification database environment
         """
         self.vdb = vdb
+        logger.info("Report status filer initialized")
 
     def create(self, aid, dig, filename, typ, stream):
         """ Create a new file upload with initial Accepted status.
@@ -117,33 +133,40 @@ class Filer:
                 z = zipfile.ZipFile(tf)
                 z.extractall(path=tempdirname)
                 manifest = None
+                metaDir = None
                 for root, dirs, _ in os.walk(tempdirname):
+<<<<<<< Updated upstream
                     if "META-INF" not in dirs or 'reports' not in dirs:
+=======
+                    if META_INF_DIR not in dirs:
+>>>>>>> Stashed changes
                         continue
-                    metaDir = os.path.join(root, 'META-INF')
-                    name = os.path.join(root, 'META-INF', 'reports.json')
+                    metaDir = os.path.join(root, META_INF_DIR)
+                    name = os.path.join(root, META_INF_DIR, REPORTS_JSON)
                     if not os.path.exists(name):
                         continue
                     f = open(name, 'r')
                     manifest = json.load(f)
-                    if "documentInfo" not in manifest:
+                    if DOC_INFO not in manifest:
                         raise kering.ValidationError("Invalid manifest file in report package, missing "
-                                                     "'documentInfo")
+                                                     f"{DOC_INFO}")
                 if manifest is None:
                     raise kering.ValidationError("No manifest in file, invalid signed report package")
 
-                docInfo = manifest["documentInfo"]
-                if "signatures" not in docInfo:
+                docInfo = manifest[DOC_INFO]
+                if SIGNATURES not in docInfo:
                     raise kering.ValidationError("No signatures found in manifest file")
 
-                signatures = docInfo["signatures"]
+                signatures = docInfo[SIGNATURES]
                 for signature in signatures:
                     try:
-                        fullpath = os.path.normpath(os.path.join(metaDir, signature["file"]))
+                        # Use the new function to find the file
+                        fullpath = FileProcessor.find_file_in_meta_dir(metaDir, signature[FILE])
+                        
                         f = open(fullpath, 'rb')
                         file_object = f.read()
                         f.close()
-                        tmp_diger = DigerBuilder.sha256(signature["digest"])
+                        tmp_diger = DigerBuilder.sha256(signature[DIGEST])
                         if not tmp_diger.verify(file_object):
                             raise kering.ValidationError(f"Invalid digest for file {fullpath}")
                     except KeyError as e:
@@ -374,7 +397,7 @@ class ReportVerifier(doing.Doer):
         for diger in self.filer.getAcceptedIter():
             try:
                 stats = self.vdb.stats.get(keys=(diger.qb64,))
-                print(f"Processing {stats.filename}:\n "
+                logger.info(f"Processing {stats.filename}:\n "
                       f"\tType={stats.contentType}\n"
                       f"\tSize={stats.size}")
                 with tempfile.TemporaryFile("w+b") as tf:
@@ -391,54 +414,75 @@ class ReportVerifier(doing.Doer):
                         files = []
                         manifest = None
                         for root, dirs, _ in os.walk(tempdirname):
+<<<<<<< Updated upstream
                             if "META-INF" not in dirs or 'reports' not in dirs:
+=======
+                            logger.info(f"Current dir {root} w/ dirs {dirs}")
+                            if META_INF_DIR not in dirs:
+                                logger.info(f"No {META_INF_DIR} found in {root}")
+>>>>>>> Stashed changes
                                 continue
 
-                            metaDir = os.path.join(root, 'META-INF')
-                            name = os.path.join(root, 'META-INF', 'reports.json')
+                            metaDir = os.path.join(root, META_INF_DIR)
+                            name = os.path.join(root, META_INF_DIR, REPORTS_JSON)
                             if not os.path.exists(name):
+                                logger.info(f"No {REPORTS_JSON} file found in {root}/{META_INF_DIR}")
                                 continue
 
                             f = open(name, 'r')
                             manifest = json.load(f)
-                            if "documentInfo" not in manifest:
+                            if DOC_INFO not in manifest:
                                 raise kering.ValidationError("Invalid manifest file in report package, missing "
+<<<<<<< Updated upstream
                                                              "'documentInfo")
                             reportsDir = os.path.join(root, 'reports')
                             files = os.listdir(reportsDir)
+=======
+                                                             f"{DOC_INFO}")
+                            logger.info(f"{DOC_INFO} found in manifest")
+                            
+                            files = os.listdir(root)
+                            logger.info(f"files in {root}: {files}")
+>>>>>>> Stashed changes
 
                         if manifest is None:
                             raise kering.ValidationError("No manifest in file, invalid signed report package")
 
-                        docInfo = manifest["documentInfo"]
+                        docInfo = manifest[DOC_INFO]
 
-                        if "signatures" not in docInfo:
+                        if SIGNATURES not in docInfo:
                             raise kering.ValidationError("No signatures found in manifest file")
 
-                        signatures = docInfo["signatures"]
+                        signatures = docInfo[SIGNATURES]
+                        logger.info(f"Found {len(signatures)} signature blocks in {DOC_INFO}")
                         signed = []
                         verfed = []
                         for signature in signatures:
+                            logger.info(f"processing signature {signature}")
                             try:
-                                aid = signature["aid"]
+                                aid = signature[AID]
 
                                 # First check to ensure signature is from submitter, otherwise skip
                                 if aid != stats.submitter:
-                                    print(f"signature from {aid} does not match submitter {stats.submitter}")
+                                    logger.info(f"signature from {aid} does not match submitter {stats.submitter}")
 
                                 # Now ensure we know who this AID is and that we have their key state
                                 if aid not in self.hby.kevers:
                                     raise kering.ValidationError(f"signature from unknown AID {aid}")
 
-                                dig = signature["digest"]
+                                dig = signature[DIGEST]
                                 non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
-                                file_name = signature["file"]
-                                fullpath = os.path.normpath(os.path.join(metaDir, file_name))
+                                file_name = signature[FILE]
+                                # fullpath = os.path.normpath(os.path.join(metaDir, file_name))
+                                
+                                # Use the new function to find the file
+                                fullpath = FileProcessor.find_file_in_meta_dir(rootDir, file_name)
+                                
                                 signed.append(os.path.basename(fullpath))
 
 
                                 kever = self.hby.kevers[aid]
-                                sigers = [Siger(qb64=sig) for sig in signature["sigs"]]
+                                sigers = [Siger(qb64=sig) for sig in signature[SIGS]]
                                 if len(sigers) == 0:
                                     raise kering.ValidationError(f"missing signatures on {file_name}")
 
@@ -463,13 +507,51 @@ class ReportVerifier(doing.Doer):
                             msg = f"All {len(files)} files in report package have been signed by " \
                                   f"submitter ({stats.submitter})."
                             self.filer.update(diger, ReportStatus.verified, msg)
-                            print(msg)
+                            logger.info(msg)
                         else:
                             msg = f"{len(diff)} files from report package missing valid signed {diff}, {signed}"
                             self.filer.update(diger, ReportStatus.failed, msg)
-                            print(msg)
+                            logger.info(msg)
 
 
             except (kering.ValidationError, zipfile.BadZipFile) as e:
                 self.filer.update(diger, ReportStatus.failed, e.args[0])
-                print(e.args[0])
+                logger.info(e.args[0])
+                
+class FileProcessor:
+    @staticmethod
+    def find_file_in_meta_dir(metaDir, file_name):
+        """
+        Check if the file exists directly in metaDir or inside a zip file in metaDir.
+        If found inside a zip file, extract it to metaDir.
+
+        Parameters:
+            metaDir (str): The directory to search for the file.
+            file_name (str): The name of the file to search for.
+
+        Returns:
+            str: The full path to the file if found.
+
+        Raises:
+            kering.ValidationError: If the file is not found in metaDir or any zip files.
+        """
+        fullpath = os.path.normpath(os.path.join(metaDir, file_name))
+
+        # Check if the file exists directly in metaDir
+        if os.path.exists(fullpath):
+            logger.info(f"File {file_name} found in metaDir")
+        else:
+            logger.info(f"File {file_name} not found in metaDir, checking zip files")
+            # If not, check if it exists inside a zip file in metaDir
+            zip_files = [f for f in os.listdir(metaDir) if f.endswith('.zip')]
+            file_found = False
+            for zip_file in zip_files:
+                with zipfile.ZipFile(os.path.join(metaDir, zip_file), 'r') as z:
+                    if file_name in z.namelist():
+                        z.extract(file_name, metaDir)
+                        fullpath = os.path.normpath(os.path.join(metaDir, file_name))
+                        logger.info(f"File {file_name} found in zip, extracted to {metaDir}")
+                        file_found = True
+                        break
+            if not file_found:
+                raise kering.ValidationError(f"File {file_name} not found in metaDir or any zip files")
