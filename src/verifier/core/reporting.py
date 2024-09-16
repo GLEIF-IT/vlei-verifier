@@ -112,7 +112,6 @@ class Filer:
         )
 
         idx = 0
-
         diger = DigerBuilder.sha256(dig)
         report = b''
         while True:
@@ -153,7 +152,7 @@ class Filer:
                         tmp_diger = DigerBuilder.sha256(dig)
                         if not tmp_diger.verify(file_object):
                             raise kering.ValidationError(f"Invalid digest for file {fullPath}")
-                        logger.info(f"File {fullPath} w/ digest {dig} verified")
+                        logger.info(f"File {fullPath} w/ digest {dig} has valid digest")
                     except KeyError as e:
                         raise kering.ValidationError(f"Invalid digest, manifest digest missing '{e.args[0]}'")
                     except OSError:
@@ -389,81 +388,81 @@ class ReportVerifier(doing.Doer):
                 with tempfile.TemporaryFile("w+b") as tf:
                     for chunk in self.filer.getData(diger.qb64):
                         tf.write(chunk)
-                        tf.seek(0)
 
-                        with tempfile.TemporaryDirectory() as tempdirname:
-                            z = zipfile.ZipFile(tf)
+                    tf.seek(0)
+                    with tempfile.TemporaryDirectory() as tempdirname:
+                        z = zipfile.ZipFile(tf)
 
-                            signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempdirname)
+                        signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempdirname)
+                        
+                        files = []
+                        reports_dir = FileProcessor.find_reports_directory(tempdirname)
+                        if reports_dir:
+                            files = FileProcessor.list_files_in_directory(reports_dir)
+                            logger.info(f"Files in reports directory: {files}")
+                        else:
+                            logger.info("No reports directory found.")
+                            raise kering.ValidationError("No reports directory found during signature processing")
                             
-                            files = []
-                            reports_dir = FileProcessor.find_reports_directory(tempdirname)
-                            if reports_dir:
-                                files = FileProcessor.list_files_in_directory(reports_dir)
-                                logger.info(f"Files in reports directory: {files}")
-                            else:
-                                logger.info("No reports directory found.")
-                                raise kering.ValidationError("No reports directory found during signature processing")
+                        signed = []
+                        verfed = []
+
+                        for signature in signatures:
+                            logger.info(f"processing signature {signature}")
+                            try:
+                                aid = signature[AID]
+
+                                # First check to ensure signature is from submitter, otherwise skip
+                                if aid != stats.submitter:
+                                    logger.info(f"signature from {aid} does not match submitter {stats.submitter}")
+
+                                # Now ensure we know who this AID is and that we have their key state
+                                if aid not in self.hby.kevers:
+                                    raise kering.ValidationError(f"signature from unknown AID {aid}")
+
+                                dig = signature[DIGEST]
+                                non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
+                                file_name = signature[FILE]
+
+                                fullPath = FileProcessor.find_file_in_meta_dir(metaDir, file_name)
+                                if not fullPath:
+                                    fullPath = FileProcessor.find_file_in_zip_files(tempdirname, metaDir, signature[FILE])
+                                if not fullPath:
+                                    raise kering.ValidationError(f"Didn't find {signature[FILE]} above {metaDir} or in zips")
                                 
-                            signed = []
-                            verfed = []
+                                signed.append(os.path.basename(fullPath))
 
-                            for signature in signatures:
-                                logger.info(f"processing signature {signature}")
-                                try:
-                                    aid = signature[AID]
+                                kever = self.hby.kevers[aid]
+                                sigers = [Siger(qb64=sig) for sig in signature[SIGS]]
+                                if len(sigers) == 0:
+                                    raise kering.ValidationError(f"missing signatures on {file_name}")
 
-                                    # First check to ensure signature is from submitter, otherwise skip
-                                    if aid != stats.submitter:
-                                        logger.info(f"signature from {aid} does not match submitter {stats.submitter}")
+                                for siger in sigers:
+                                    siger.verfer = kever.verfers[siger.index]  # assign verfer
+                                    if not siger.verfer.verify(siger.raw, bytes(non_prefixed_dig, "utf-8")):  # verify each sig
+                                        raise kering.ValidationError(f"signature {siger.index} invalid for {file_name}")
 
-                                    # Now ensure we know who this AID is and that we have their key state
-                                    if aid not in self.hby.kevers:
-                                        raise kering.ValidationError(f"signature from unknown AID {aid}")
+                                verfed.append(os.path.basename(fullPath))
 
-                                    dig = signature[DIGEST]
-                                    non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
-                                    file_name = signature[FILE]
+                            except KeyError as e:
+                                raise kering.ValidationError(f"Invalid signature in manifest missing '{e.args[0]}'")
+                            except OSError:
+                                raise kering.ValidationError(f"signature element={signature} point to invalid file")
 
-                                    fullPath = FileProcessor.find_file_in_meta_dir(metaDir, file_name)
-                                    if not fullPath:
-                                        fullPath = FileProcessor.find_file_in_zip_files(tempdirname, metaDir, signature[FILE])
-                                    if not fullPath:
-                                        raise kering.ValidationError(f"Didn't find {signature[FILE]} above {metaDir} or in zips")
-                                    
-                                    signed.append(os.path.basename(fullPath))
-
-                                    kever = self.hby.kevers[aid]
-                                    sigers = [Siger(qb64=sig) for sig in signature[SIGS]]
-                                    if len(sigers) == 0:
-                                        raise kering.ValidationError(f"missing signatures on {file_name}")
-
-                                    for siger in sigers:
-                                        siger.verfer = kever.verfers[siger.index]  # assign verfer
-                                        if not siger.verfer.verify(siger.raw, bytes(non_prefixed_dig, "utf-8")):  # verify each sig
-                                            raise kering.ValidationError(f"signature {siger.index} invalid for {file_name}")
-
-                                    verfed.append(os.path.basename(fullPath))
-
-                                except KeyError as e:
-                                    raise kering.ValidationError(f"Invalid signature in manifest missing '{e.args[0]}'")
-                                except OSError:
-                                    raise kering.ValidationError(f"signature element={signature} point to invalid file")
-
-                                except Exception as e:
-                                    raise kering.ValidationError(f"{e}")
+                            except Exception as e:
+                                raise kering.ValidationError(f"{e}")
 
 
-                            diff = set(files) - set(verfed)
-                            if len(diff) == 0:
-                                msg = f"All {len(files)} files in report package have been signed by " \
-                                        f"submitter ({stats.submitter})."
-                                self.filer.update(diger, ReportStatus.verified, msg)
-                                logger.info(msg)
-                            else:
-                                msg = f"{len(diff)} files from report package missing valid signed {diff}, {signed}"
-                                self.filer.update(diger, ReportStatus.failed, msg)
-                                logger.info(msg)
+                        diff = set(files) - set(verfed)
+                        if len(diff) == 0:
+                            msg = f"All {len(files)} files in report package have been signed by " \
+                                    f"submitter ({stats.submitter})."
+                            self.filer.update(diger, ReportStatus.verified, msg)
+                            logger.info(msg)
+                        else:
+                            msg = f"{len(diff)} files from report package missing valid signature {diff}"
+                            self.filer.update(diger, ReportStatus.failed, msg)
+                            logger.info(msg)
 
 
             except (kering.ValidationError, zipfile.BadZipFile) as e:
