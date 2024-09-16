@@ -1,8 +1,13 @@
+import json
+import os
+import tempfile
+import zipfile
 import pytest
 from hashlib import sha256
 
 from keri import kering
 
+from src.verifier.core.reporting import FileProcessor
 from src.verifier.core.utils import DigerBuilder
 
 
@@ -29,4 +34,3 @@ def test_diger_builder_wrong_dig():
     # Here the dig is not prefixed
     with pytest.raises(kering.ValidationError) as exc_info:
         diger = DigerBuilder.sha256(dig)
-

@@ -136,9 +136,9 @@ class Filer:
                 for signature in signatures:
                     try:
                         # Use the new function to find the file
-                        fullPath = FileProcessor.find_file_in_meta_dir(metaDir, signature[FILE])
+                        fullPath = FileProcessor.find_file_in_dir(metaDir, signature[FILE])
                         if(not fullPath):
-                            fullPath = FileProcessor.find_file_in_zip_files(tempdirname, metaDir, signature[FILE])
+                            fullPath = FileProcessor.find_file_in_zip_files(tempdirname, signature[FILE])
                         
                         if not fullPath:
                             raise kering.ValidationError(f"Didn't find {signature[FILE]} above {metaDir} or in zips")
@@ -424,9 +424,9 @@ class ReportVerifier(doing.Doer):
                                 non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
                                 file_name = signature[FILE]
 
-                                fullPath = FileProcessor.find_file_in_meta_dir(metaDir, file_name)
+                                fullPath = FileProcessor.find_file_in_dir(metaDir, file_name)
                                 if not fullPath:
-                                    fullPath = FileProcessor.find_file_in_zip_files(tempdirname, metaDir, signature[FILE])
+                                    fullPath = FileProcessor.find_file_in_zip_files(tempdirname, signature[FILE])
                                 if not fullPath:
                                     raise kering.ValidationError(f"Didn't find {signature[FILE]} above {metaDir} or in zips")
                                 
@@ -499,13 +499,13 @@ class FileProcessor:
         return None
     
     @staticmethod
-    def find_file_in_zip_files(zipDir, metaDir, file_name):
+    def find_file_in_zip_files(zipsDir, file_name):
         """
-        Check if the file exists directly in metaDir or inside a zip file in metaDir.
+        Check if the file exists inside a zip file in metaDir.
         If found inside a zip file, extract it to metaDir.
 
         Parameters:
-            metaDir (str): The directory to search for the file.
+            zipsDir (str): The directory to search for the file.
             file_name (str): The name of the file to search for.
 
         Returns:
@@ -514,7 +514,7 @@ class FileProcessor:
         Raises:
             kering.ValidationError: If the file is not found in metaDir or any zip files.
         """
-        logger.info(f"Finding file {metaDir}/{file_name} in zip files...")
+        logger.info(f"Finding file {file_name} in zip files...")
         
         # Extract the base file name and directory from the file_name
         base_file_name = os.path.basename(file_name)
@@ -523,15 +523,15 @@ class FileProcessor:
         # Create a regular expression pattern to match the target file path
         target_pattern = re.compile(rf'(.*/)?{re.escape(file_dir)}/?{re.escape(base_file_name)}')
 
-        zip_files = [f for f in os.listdir(zipDir) if f.endswith('.zip')]
+        zip_files = [f for f in os.listdir(zipsDir) if f.endswith('.zip')]
         file_found = False
         for zip_file in zip_files:
-            with zipfile.ZipFile(os.path.join(zipDir, zip_file), 'r') as z:
+            with zipfile.ZipFile(os.path.join(zipsDir, zip_file), 'r') as z:
                 zip_contents = z.namelist()
                 for zip_content in zip_contents:
                     if target_pattern.match(zip_content):
-                        z.extract(zip_content, zipDir)
-                        repPath = os.path.join(zipDir, zip_content)
+                        z.extract(zip_content, zipsDir)
+                        repPath = os.path.join(zipsDir, zip_content)
                         if os.path.exists(repPath):
                             logger.info(f"File {file_name} found in zip, extracted to {repPath}")
                             file_found = True
@@ -543,7 +543,7 @@ class FileProcessor:
         return None
     
     @staticmethod
-    def find_file_in_meta_dir(metaDir, file_name):
+    def find_file_in_dir(dir, file_name):
         """
         Check if the file exists directly in metaDir or inside a zip file in metaDir.
         If found inside a zip file, extract it to metaDir.
@@ -558,14 +558,14 @@ class FileProcessor:
         Raises:
             kering.ValidationError: If the file is not found in metaDir or any zip files.
         """
-        fullPath = os.path.normpath(os.path.join(metaDir, file_name))
+        fullPath = os.path.normpath(os.path.join(dir, file_name))
 
         # Check if the file exists directly in metaDir
         if os.path.exists(fullPath):
-            logger.info(f"File {fullPath} found in {metaDir}")
+            logger.info(f"File {fullPath} found in {dir}")
             return fullPath
         else:
-            logger.info(f"File {fullPath} not found in {metaDir}")
+            logger.info(f"File {fullPath} not found in {dir}")
             return None
         
     @staticmethod
