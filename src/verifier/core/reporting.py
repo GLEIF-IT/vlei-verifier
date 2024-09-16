@@ -569,7 +569,7 @@ class FileProcessor:
             return None
         
     @staticmethod
-    def list_files_in_zip_excluding_report_json(zip_file_path):
+    def list_files_in_zip(zip_file_path):
         """
         List all files in a zip file excluding 'report.json' files.
 
@@ -585,25 +585,6 @@ class FileProcessor:
         with zipfile.ZipFile(zip_file_path, 'r') as zip_file:
             all_files = zip_file.namelist()
             filtered_files = [file for file in all_files if os.path.basename(file) != 'report.json']
-        
-        return filtered_files
-    
-    @staticmethod
-    def list_files_excluding_report_json(directory_path):
-        """
-        List all files in a directory excluding 'report.json' files.
-
-        Parameters:
-            directory_path (str): The path to the directory.
-
-        Returns:
-            list: A list of file names in the directory excluding 'report.json' files.
-        """
-        if not os.path.isdir(directory_path):
-            raise NotADirectoryError(f"The path {directory_path} is not a directory.")
-
-        all_files = os.listdir(directory_path)
-        filtered_files = [file for file in all_files if file != 'report.json']
         
         return filtered_files
     

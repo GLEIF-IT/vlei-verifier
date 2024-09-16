@@ -66,11 +66,9 @@ class TestFileProcessor(unittest.TestCase):
                 assert repDir == os.path.join(temp_dir, "reports")
                 signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=temp_dir)
                 assert len(signatures) == 0
-                filesNotReportJson = FileProcessor.list_files_excluding_report_json(os.path.join(temp_dir, "reports"))
-                assert set(filesNotReportJson) == {'report_2.txt', 'report_1.txt', 'report_0.txt'}
                 filesInDir = FileProcessor.list_files_in_directory(temp_dir)
                 assert set(filesInDir) == {os.path.basename(metaDir),os.path.basename(repDir)}
-                fileInZip = FileProcessor.list_files_in_zip_excluding_report_json(self.zip1_name)
+                fileInZip = FileProcessor.list_files_in_zip(self.zip1_name)
                 assert set(fileInZip) == {'META-INF/reports.json', 'reports/report_2.txt', 'reports/report_1.txt', 'reports/report_0.txt'}
 
 if __name__ == "__main__":
