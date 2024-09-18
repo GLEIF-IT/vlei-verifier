@@ -136,7 +136,7 @@ class Filer:
                 signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempDir)
                 for signature in signatures:
                     try:
-                        fullPath = FileProcessor.find_file(signature[FILE], tempDir, metaDir)
+                        fullPath = FileProcessor.find_file(signature[FILE], tempDir)
                         
                         f = open(fullPath, 'rb')
                         file_object = f.read()
@@ -426,7 +426,7 @@ class ReportVerifier(doing.Doer):
                                 non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
                                 file_name = signature[FILE]
 
-                                fullPath = FileProcessor.find_file(file_name, metaDir, tempDir)
+                                fullPath = FileProcessor.find_file(file_name, tempDir)
                                 
                                 signed.append(os.path.basename(fullPath))
 
@@ -515,22 +515,20 @@ class FileProcessor:
         return None
 
     @staticmethod
-    def find_file(fileName: str, tempDir: str, metaDir: str) -> str:
+    def find_file(fileName: str, tempDir: str) -> str:
         fullPath = FileProcessor.find_file_in_dir(tempDir, fileName)
-        if not fullPath:
-            fullPath = FileProcessor.find_file_in_dir(metaDir, os.path.basename(fileName))
         if not fullPath:
             fullPath = FileProcessor.find_file_in_zip_files(tempDir, fileName)
         if not fullPath:
-            raise kering.ValidationError(f"Didn't find {fileName} in {tempDir}, {metaDir}, nor in zips")
+            raise kering.ValidationError(f"Didn't find {fileName} in {tempDir}, nor in zips")
         
         return fullPath
     
     @staticmethod
     def find_file_in_zip_files(zipsDir, file_name):
         """
-        Check if the file exists inside a zip file in metaDir.
-        If found inside a zip file, extract it to metaDir.
+        Check if the file exists inside a zip in zipsDir.
+        If found inside a zip file, extract it.
 
         Parameters:
             zipsDir (str): The directory to search for the file.
@@ -565,37 +563,43 @@ class FileProcessor:
                             file_found = True
                             return repPath
 
-        if not file_found:
-            raise kering.ValidationError(f"File {file_name} not found in any zip files")
-
+        logger.info(f"File {file_name} not found in any zip files")
         return None
     
     @staticmethod
-    def find_file_in_dir(dir, file_name):
+    def find_file_in_dir(dir, file_name) -> str:
         """
-        Check if the file exists directly in metaDir or inside a zip file in metaDir.
-        If found inside a zip file, extract it to metaDir.
+        Check if the file exists directly in dir or in a specified subdirectory.
 
         Parameters:
-            metaDir (str): The directory to search for the file.
-            file_name (str): The name of the file to search for.
+            dir (str): The parent directory to search for the file.
+            file_name (str): The name of the file to search for, which may include a subdirectory.
 
         Returns:
             str: The full path to the file if found.
 
         Raises:
-            kering.ValidationError: If the file is not found in metaDir or any zip files.
+            kering.ValidationError: If the file is not found in dir or any subdirectories.
         """
-        fullPath = os.path.normpath(os.path.join(dir, file_name))
+        # Split the file_name into directory and file components
+        file_dir, file_base_name = os.path.split(file_name)
 
-        # Check if the file exists directly in metaDir
-        if os.path.exists(fullPath):
+        if(file_dir == '' and os.path.isfile(os.path.join(dir, file_name))):
+            fullPath = os.path.normpath(os.path.join(dir, file_base_name))
             logger.info(f"File {fullPath} found in {dir}")
             return fullPath
-        else:
-            logger.info(f"File {fullPath} not found in {dir}")
-            return None
-        
+
+        # Recursively search through the directory and subdirectories
+        for root, dirs, files in os.walk(dir):
+            # Check if the current root matches the specified file_dir
+            if os.path.basename(root) == file_dir and file_base_name in files:
+                fullPath = os.path.normpath(os.path.join(root, file_base_name))
+                logger.info(f"File {fullPath} found in {root}")
+                return fullPath
+
+        logger.info(f"File {file_name} not found in {dir}")
+        return None
+            
     @staticmethod
     def list_files_in_zip(zip_file_path):
         """
