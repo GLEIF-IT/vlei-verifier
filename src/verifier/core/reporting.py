@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+import traceback
 import zipfile
 from collections import namedtuple
 from dataclasses import asdict
@@ -130,18 +131,12 @@ class Filer:
         with tempfile.TemporaryFile("w+b") as tf:
             tf.write(report)
             tf.seek(0)
-            with tempfile.TemporaryDirectory() as tempdirname:
+            with tempfile.TemporaryDirectory() as tempDir:
                 z = zipfile.ZipFile(tf)
-                signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempdirname)
+                signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempDir)
                 for signature in signatures:
                     try:
-                        # Use the new function to find the file
-                        fullPath = FileProcessor.find_file_in_dir(metaDir, signature[FILE])
-                        if(not fullPath):
-                            fullPath = FileProcessor.find_file_in_zip_files(tempdirname, signature[FILE])
-                        
-                        if not fullPath:
-                            raise kering.ValidationError(f"Didn't find {signature[FILE]} above {metaDir} or in zips")
+                        fullPath = FileProcessor.find_file(signature[FILE], tempDir, metaDir)
                         
                         f = open(fullPath, 'rb')
                         file_object = f.read()
@@ -333,6 +328,7 @@ class ReportResourceEnd:
                                     stream=part.stream)
                     upload = True
                 except Exception as e:
+                    traceback.print_exc()
                     raise falcon.HTTPBadRequest(description=f"{str(e)}")
 
         if not upload:
@@ -390,23 +386,29 @@ class ReportVerifier(doing.Doer):
                         tf.write(chunk)
 
                     tf.seek(0)
-                    with tempfile.TemporaryDirectory() as tempdirname:
+                    with tempfile.TemporaryDirectory() as tempDir:
                         z = zipfile.ZipFile(tf)
 
-                        signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempdirname)
+                        signatures, metaDir = FileProcessor.getSignaturesFromZip(zipFile=z, extractDir=tempDir)
                         
                         files = []
-                        reports_dir = FileProcessor.find_reports_directory(tempdirname)
-                        if reports_dir:
-                            files = FileProcessor.list_files_in_directory(reports_dir)
-                            logger.info(f"Files in reports directory: {files}")
+                        simple_file_listing = FileProcessor.determine_file_listing_type(signatures)                        
+                        if not simple_file_listing:
+                            # complex file listing
+                            reports_dir = FileProcessor.find_reports_directory(tempDir)
+                            if reports_dir:
+                                files = FileProcessor.list_files_in_directory(reports_dir)
+                                logger.info(f"Files in reports directory: {files}")
+                            else:
+                                logger.info("No reports directory found.")
+                                raise kering.ValidationError("No reports directory found during signature processing")
                         else:
-                            logger.info("No reports directory found.")
-                            raise kering.ValidationError("No reports directory found during signature processing")
+                            #simple file listing
+                            for signature in signatures:
+                                files.append(signature[FILE])
                             
                         signed = []
                         verfed = []
-
                         for signature in signatures:
                             logger.info(f"processing signature {signature}")
                             try:
@@ -424,11 +426,7 @@ class ReportVerifier(doing.Doer):
                                 non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
                                 file_name = signature[FILE]
 
-                                fullPath = FileProcessor.find_file_in_dir(metaDir, file_name)
-                                if not fullPath:
-                                    fullPath = FileProcessor.find_file_in_zip_files(tempdirname, signature[FILE])
-                                if not fullPath:
-                                    raise kering.ValidationError(f"Didn't find {signature[FILE]} above {metaDir} or in zips")
+                                fullPath = FileProcessor.find_file(file_name, metaDir, tempDir)
                                 
                                 signed.append(os.path.basename(fullPath))
 
@@ -470,6 +468,24 @@ class ReportVerifier(doing.Doer):
                 logger.info(e.args[0])
                 
 class FileProcessor:
+    
+    @staticmethod
+    def determine_file_listing_type(signatures) -> bool:
+        """
+        Determine the type of file listing in the signatures.
+
+        Parameters:
+            signatures (list): A list of signature objects.
+
+        Returns:
+            bool: True if the file listing is simple, else False.
+        """
+        for signature in signatures:
+            if signature[FILE] == os.path.basename(signature[FILE]):
+                return True
+            else:
+                return False
+        return False
 
     @staticmethod
     def find_reports_directory(start_dir):
@@ -497,6 +513,18 @@ class FileProcessor:
                                 zip_file.extractall(root)
                                 return FileProcessor.find_reports_directory(root)
         return None
+
+    @staticmethod
+    def find_file(fileName: str, tempDir: str, metaDir: str) -> str:
+        fullPath = FileProcessor.find_file_in_dir(tempDir, fileName)
+        if not fullPath:
+            fullPath = FileProcessor.find_file_in_dir(metaDir, os.path.basename(fileName))
+        if not fullPath:
+            fullPath = FileProcessor.find_file_in_zip_files(tempDir, fileName)
+        if not fullPath:
+            raise kering.ValidationError(f"Didn't find {fileName} in {tempDir}, {metaDir}, nor in zips")
+        
+        return fullPath
     
     @staticmethod
     def find_file_in_zip_files(zipsDir, file_name):
