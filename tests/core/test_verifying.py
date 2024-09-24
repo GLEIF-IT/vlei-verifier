@@ -67,7 +67,11 @@ def test_setup_verifying(seeder):
         assert result.status == falcon.HTTP_403
 
 def test_ecr(seeder):        
+    app = falcon.App()
+
     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
+        vdb = basing.VerifierBaser(name=hby.name, temp=True)
+        
         #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
@@ -85,33 +89,40 @@ def test_ecr(seeder):
         eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA, registry=registry, sedge=eaedge)
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA, eacred, seqner)
         
+        # try submitting the ECR auth cred
+        issAndCred = bytearray()
+        issAndCred.extend(eamsgs)
+        acdc = issAndCred.decode("utf-8")
+        client = falcon.testing.TestClient(app)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eacrdntler.rgy.reger)
+        result = client.simulate_put(f'/presentations/{easaid}',
+                                        body=acdc,
+                                        headers={'Content-Type': 'application/json+cesr'})
+        # ecr auth cred is verified to be a valid credential
+        assert result.status == falcon.HTTP_202
+        hby.kevers[hab.pre] = hab.kever
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth.processPresentations()
+        # ecr auth cred is not authorized
+        result = client.simulate_get(f'/authorizations/{hab.pre}')
+        assert result.status == falcon.HTTP_401
+        
         #chained ecr auth cred
         ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA)
         
         ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge)
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
-        
-        app = falcon.App()
-        vdb = basing.VerifierBaser(name=hby.name, temp=True)
-        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
 
         issAndCred = bytearray()
-        # issAndCred.extend(kmsgs)
-        # issAndCred.extend(tmsgs)
-        # issAndCred.extend(imsgs)
         issAndCred.extend(ecmsgs)
         acdc = issAndCred.decode("utf-8")
-
-        # Create a test client
         client = falcon.testing.TestClient(app)
-        # Define the said and the credential
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
         result = client.simulate_put(f'/presentations/{ecsaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_202
-        
         hby.kevers[hab.pre] = hab.kever
-        
         auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
         auth.processPresentations()
         
