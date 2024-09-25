@@ -142,6 +142,24 @@ def test_ecr(seeder):
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert cig.qb64 == '0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP'
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
+        
+        # try submitting the ECR auth cred now that we're already authorized
+        issAndCred = bytearray()
+        issAndCred.extend(eamsgs)
+        acdc = issAndCred.decode("utf-8")
+        client = falcon.testing.TestClient(app)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eacrdntler.rgy.reger)
+        result = client.simulate_put(f'/presentations/{easaid}',
+                                        body=acdc,
+                                        headers={'Content-Type': 'application/json+cesr'})
+        # ecr auth cred is verified to be a valid credential
+        assert result.status == falcon.HTTP_202
+        hby.kevers[hab.pre] = hab.kever
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth.processPresentations()
+        # ecr auth cred is not authorized
+        result = client.simulate_get(f'/authorizations/{hab.pre}')
+        assert result.status == falcon.HTTP_401
 
 def test_ecr_missing(seeder):        
     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):

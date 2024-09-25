@@ -136,7 +136,10 @@ class PresentationResourceEndpoint:
         cred_attrs = creder.sad['a']
         creds = None
         if 'i' in cred_attrs:
-            saids = self.vry.reger.subjs.get(keys=cred_attrs['i'])
+            aid = cred_attrs['i']
+            # clear any previous login, now that a valid credential has been presented
+            self.vdb.accts.rem(keys=(aid,))
+            saids = self.vry.reger.subjs.get(keys=aid,)
             creds = self.vry.reger.cloneCreds(saids, self.hby.db)
         else:
             creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
