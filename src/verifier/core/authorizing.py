@@ -243,11 +243,11 @@ class Monitorer(doing.Doer):
 
         """
         for (aid,), acct in self.vdb.accts.getItemIter():
-            (said, lei) = tuple(json.loads(acct.decode("utf-8")))
-            self.witq.query(src=self.hab.pre, pre=prefixer.qb64)
+            (said, lei, aid, sn) = tuple(json.loads(acct.decode("utf-8")))
+            self.witq.query(src=self.hab.pre, pre=aid)
 
-            kever = self.hby.kevers[prefixer.qb64]
-            if kever.sner.num > seqner.num:
+            kever = self.hby.kevers[aid]
+            if kever.sner.num > sn:
                 print("Identifier rotation detected")
                 creder = self.reger.creds.get(keys=(said,))
                 match creder.schema:
@@ -256,5 +256,5 @@ class Monitorer(doing.Doer):
                     case _:
                         continue
 
-                self.vdb.accts.pin(keys=(aid,), val=(saider, creder.subject["LEI"], kever.prefixer, kever.sner))
+                self.vdb.accts.pin(keys=(aid,), val=(saider, creder.subject["LEI"], aid, kever.sner))
 
