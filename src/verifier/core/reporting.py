@@ -90,7 +90,7 @@ class Filer:
         self.vdb = vdb
         logger.info("Report status filer initialized")
 
-    def create(self, aid, dig, filename, typ, stream):
+    def create(self, aid, dig, lei, filename, typ, stream):
         """ Create a new file upload with initial Accepted status.
 
         This method creates the report upload status object and queues it for report verification processing
@@ -271,12 +271,19 @@ class ReportResourceEnd:
         if aid not in self.hby.kevers:
             raise falcon.HTTPNotFound(description=f"unknown AID: {aid}")
 
-        if self.vdb.accts.get(keys=(aid,)) is None:
+        acct = self.vdb.accts.get(keys=(aid,))
+        if acct is None:
             raise falcon.HTTPForbidden(description=f"identifier {aid} has no valid credential for access")
+
+        (said, aLEI) = tuple(json.loads(acct))
 
         stats = self.filer.get(dig)
         if stats is None:
             raise falcon.HTTPNotFound(description=f"report {dig} not found")
+
+        (sList, fLEI) = stats
+        if (fLEI != aLEI):
+            raise falcon.HTTPNotFound(description=f"report {dig} LEI {fLEI} not available to this user LEI {aLEI}")
 
         rep.status = falcon.HTTP_200
         rep.data = json.dumps(asdict(stats)).encode("utf-8")
@@ -316,15 +323,21 @@ class ReportResourceEnd:
         if aid not in self.hby.kevers:
             raise falcon.HTTPNotFound(description=f"unknown AID: {aid}")
 
-        if self.vdb.accts.get(keys=(aid,)) is None:
+        acct = self.vdb.accts.get(keys=(aid,))
+        if acct is None:
             raise falcon.HTTPForbidden(description=f"identifier {aid} has no valid credential for access")
+
+        (said, lei) = tuple(json.loads(acct.decode("utf-8")))
 
         form = req.get_media()
         upload = False
         for part in form:
             if part.name == "upload":
                 try:
-                    self.filer.create(aid=aid, dig=dig, filename=part.secure_filename, typ=part.content_type,
+                    logger.info(f"Upload passed AID checks, Creating filer  {part.filename}:\n "
+                      f"\tType={part.contentType}\n"
+                      f"\tSize={part.size}")
+                    self.filer.create(aid=aid, dig=dig, lei=lei, filename=part.secure_filename, typ=part.content_type,
                                     stream=part.stream)
                     upload = True
                 except Exception as e:
@@ -412,15 +425,28 @@ class ReportVerifier(doing.Doer):
                         for signature in signatures:
                             logger.info(f"processing signature {signature}")
                             try:
-                                aid = signature[AID]
+                                sigAid = signature[AID]
+                                sigAcct = self.accts.get(keys=(sigAid,))
+                                if sigAcct == None:
+                                    raise kering.ValidationError("signature from AID that is not a known submitter")
 
-                                # First check to ensure signature is from submitter, otherwise skip
-                                if aid != stats.submitter:
-                                    logger.info(f"signature from {aid} does not match submitter {stats.submitter}")
+                                (sigSaider, sigLEI) = tuple(json.loads(sigAcct.decode("utf-8")))
+
+                                subAcct = self.accts.get(keys=(stats.submitter,))
+                                if subAcct == None:
+                                    raise kering.ValidationError(f"submitter does not have a valid account")
+                                
+                                (subSaider, subLEI) = tuple(json.loads(subAcct.decode("utf-8")))
+                                
+                                if sigLEI != subLEI:
+                                    raise kering.ValidationError(f"submitter LEI {subLEI} is not the same as signer LEI {sigLEI}")
 
                                 # Now ensure we know who this AID is and that we have their key state
-                                if aid not in self.hby.kevers:
-                                    raise kering.ValidationError(f"signature from unknown AID {aid}")
+                                if sigAid not in self.hby.kevers:
+                                    raise kering.ValidationError(f"signature from unknown AID {sigAid}")
+                                
+                                if sigAid != stats.submitter:
+                                    logger.info(f"signature from {sigAid} does not match submitter {stats.submitter}")
 
                                 dig = signature[DIGEST]
                                 non_prefixed_dig = DigerBuilder.get_non_prefixed_digest(dig)
@@ -430,7 +456,7 @@ class ReportVerifier(doing.Doer):
                                 
                                 signed.append(os.path.basename(fullPath))
 
-                                kever = self.hby.kevers[aid]
+                                kever = self.hby.kevers[sigAid]
                                 sigers = [Siger(qb64=sig) for sig in signature[SIGS]]
                                 if len(sigers) == 0:
                                     raise kering.ValidationError(f"missing signatures on {file_name}")
@@ -438,14 +464,14 @@ class ReportVerifier(doing.Doer):
                                 for siger in sigers:
                                     siger.verfer = kever.verfers[siger.index]  # assign verfer
                                     if not siger.verfer.verify(siger.raw, bytes(non_prefixed_dig, "utf-8")):  # verify each sig
-                                        raise kering.ValidationError(f"signature {siger.index} invalid for {file_name}")
+                                        raise kering.ValidationError(f"signature {siger.index} invalid for {file_name} or wasn't signed by {sigAid}")
 
                                 verfed.append(os.path.basename(fullPath))
 
                             except KeyError as e:
                                 raise kering.ValidationError(f"Invalid signature in manifest missing '{e.args[0]}'")
                             except OSError:
-                                raise kering.ValidationError(f"signature element={signature} point to invalid file")
+                                raise kering.ValidationError(f"signature element={signature} points to invalid file")
 
                             except Exception as e:
                                 raise kering.ValidationError(f"{e}")
@@ -453,19 +479,20 @@ class ReportVerifier(doing.Doer):
 
                         diff = set(files) - set(verfed)
                         if len(diff) == 0:
-                            msg = f"All {len(files)} files in report package have been signed by " \
-                                    f"submitter ({stats.submitter})."
+                            msg = f"All {len(files)} files in report package, submitted by {stats.submitter}, have been signed by " \
+                                    f"known AIDs from the LEI {subLEI}."
                             self.filer.update(diger, ReportStatus.verified, msg)
-                            logger.info(msg)
+                            logger.info(f"Added verified status message {msg}")
                         else:
                             msg = f"{len(diff)} files from report package missing valid signature {diff}"
                             self.filer.update(diger, ReportStatus.failed, msg)
-                            logger.info(msg)
+                            logger.info(f"Added failed status message {msg}")
 
 
             except (kering.ValidationError, zipfile.BadZipFile) as e:
-                self.filer.update(diger, ReportStatus.failed, e.args[0])
-                logger.info(e.args[0])
+                msg = e.args[0]
+                self.filer.update(diger, ReportStatus.failed, msg)
+                logger.info(f"Added failed status message {msg}")
                 
 class FileProcessor:
     

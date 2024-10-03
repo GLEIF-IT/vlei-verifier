@@ -18,7 +18,7 @@ def test_vdb():
 
     assert isinstance(baser.iss, subing.CesrSuber)
     assert isinstance(baser.rev, subing.CesrSuber)
-    assert isinstance(baser.accts, subing.CesrSuber)
+    assert isinstance(baser.accts, subing.Suber)
     assert isinstance(baser.rpts, subing.CesrIoSetSuber)
     assert isinstance(baser.stts, subing.CesrIoSetSuber)
     assert isinstance(baser.imgs, lmdb._Database)

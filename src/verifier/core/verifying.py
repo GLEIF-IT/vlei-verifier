@@ -139,6 +139,8 @@ class PresentationResourceEndpoint:
             aid = cred_attrs['i']
             # clear any previous login, now that a valid credential has been presented
             self.vdb.accts.rem(keys=(aid,))
+            print(f"{aid} account cleared after successful presentation, validation of new account will begin soon.")            
+
             saids = self.vry.reger.subjs.get(keys=aid,)
             creds = self.vry.reger.cloneCreds(saids, self.hby.db)
         else:
@@ -208,15 +210,20 @@ class AuthorizationResourceEnd:
             rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
             return
 
-        if (saider := self.vdb.accts.get(keys=(aid,))) is None:
+        acct = self.vdb.accts.get(keys=(aid,))
+        if (acct) is None:
             rep.status = falcon.HTTP_UNAUTHORIZED
             rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
             return
+        
+        # dAcct = acct.decode("utf-8")
+        jAcct = json.loads(acct)
+        (said,lei) = tuple(jAcct)
 
         body = dict(
             aid=aid,
-            said=saider.qb64,
-            msg="AID presented valid credential"
+            said=said,
+            msg=f"AID w/ lei ${lei} presented valid credential"
         )
 
         rep.status = falcon.HTTP_OK
@@ -294,7 +301,8 @@ class RequestVerifierResourceEnd:
             rep.data = json.dumps(dict(msg=f"unknown {aid} used to sign header")).encode("utf-8")
             return
 
-        if self.vdb.accts.get(keys=(aid,)) is None:
+        acct = self.vdb.accts.get(keys=(aid,))
+        if acct is None:
             rep.status = falcon.HTTP_FORBIDDEN
             rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
             return

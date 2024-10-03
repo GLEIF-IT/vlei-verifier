@@ -6,8 +6,8 @@ verfier.core.handling module
 EXN Message handling
 """
 import datetime
-
 from hio.base import doing
+import json
 from keri import kering
 from keri.core import coring
 from keri.help import helping
@@ -115,7 +115,7 @@ class Authorizer:
     def processEcr(self, creder):
         """ Process a fully verified engagement context role vLEI credential presentation
 
-        1.  Ensure the LEI is in the list of acceptable LEIs
+        1.  If the LEI filter is configured, ensure the LEI is in the list of acceptable LEIs
         2.  Ensure the role matches the required role for submission
         3.  Save the credential as successful for submission acceptance.
 
@@ -145,7 +145,7 @@ class Authorizer:
             return
 
         print("Successful authentication, storing user.")
-        self.vdb.accts.pin(keys=(issuee,), val=coring.Saider(qb64=creder.said))
+        self.vdb.accts.pin(keys=(issuee,), val=(json.dumps((creder.said,LEI)).encode("utf-8")))
 
     def processRevocations(self):
         """ Loop over database of credential revocations.
@@ -242,11 +242,12 @@ class Monitorer(doing.Doer):
                 Tymist instance. Calling tymth() returns associated Tymist .tyme.
 
         """
-        for (said,), (prefixer, seqner) in self.vdb.accts.getItemIter():
-            self.witq.query(src=self.hab.pre, pre=prefixer.qb64)
+        for (aid,), acct in self.vdb.accts.getItemIter():
+            (said, lei, aid, sn) = tuple(json.loads(acct.decode("utf-8")))
+            self.witq.query(src=self.hab.pre, pre=aid)
 
-            kever = self.hby.kevers[prefixer.qb64]
-            if kever.sner.num > seqner.num:
+            kever = self.hby.kevers[aid]
+            if kever.sner.num > sn:
                 print("Identifier rotation detected")
                 creder = self.reger.creds.get(keys=(said,))
                 match creder.schema:
@@ -255,5 +256,5 @@ class Monitorer(doing.Doer):
                     case _:
                         continue
 
-                self.vdb.accts.pin(keys=(creder.said,), val=(kever.prefixer, kever.sner))
+                self.vdb.accts.pin(keys=(aid,), val=(said, creder.subject["LEI"], aid, kever.sner))
 
