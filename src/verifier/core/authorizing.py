@@ -256,5 +256,5 @@ class Monitorer(doing.Doer):
                     case _:
                         continue
 
-                self.vdb.accts.pin(keys=(aid,), val=(saider, creder.subject["LEI"], aid, kever.sner))
+                self.vdb.accts.pin(keys=(aid,), val=(said, creder.subject["LEI"], aid, kever.sner))
 

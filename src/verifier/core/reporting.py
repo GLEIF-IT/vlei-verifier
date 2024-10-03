@@ -334,9 +334,9 @@ class ReportResourceEnd:
         for part in form:
             if part.name == "upload":
                 try:
-                    logger.info(f"Upload passed AID checks, Creating filer  {stats.filename}:\n "
-                      f"\tType={stats.contentType}\n"
-                      f"\tSize={stats.size}")
+                    logger.info(f"Upload passed AID checks, Creating filer  {part.filename}:\n "
+                      f"\tType={part.contentType}\n"
+                      f"\tSize={part.size}")
                     self.filer.create(aid=aid, dig=dig, lei=lei, filename=part.secure_filename, typ=part.content_type,
                                     stream=part.stream)
                     upload = True
