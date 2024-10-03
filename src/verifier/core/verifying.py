@@ -140,6 +140,7 @@ class PresentationResourceEndpoint:
             # clear any previous login, now that a valid credential has been presented
             self.vdb.accts.rem(keys=(aid,))
             print(f"{aid} account cleared after successful presentation, validation of new account will begin soon.")            
+
             saids = self.vry.reger.subjs.get(keys=aid,)
             creds = self.vry.reger.cloneCreds(saids, self.hby.db)
         else:
