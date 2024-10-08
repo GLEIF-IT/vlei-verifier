@@ -12,6 +12,8 @@ from keri import kering
 from keri.core import coring
 from keri.help import helping
 
+from verifier.core.basing import Account
+
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
 EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Data Submitter"
@@ -143,9 +145,10 @@ class Authorizer:
         if role not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
             print(f"{role} in not a valid submitter role")
             return
-
+        
+        acct = Account(issuee, creder.said,LEI)
         print("Successful authentication, storing user.")
-        self.vdb.accts.pin(keys=(issuee,), val=(json.dumps((creder.said,LEI)).encode("utf-8")))
+        self.vdb.accts.pin(keys=(issuee,), val=acct)
 
     def processRevocations(self):
         """ Loop over database of credential revocations.
@@ -242,19 +245,20 @@ class Monitorer(doing.Doer):
                 Tymist instance. Calling tymth() returns associated Tymist .tyme.
 
         """
-        for (aid,), acct in self.vdb.accts.getItemIter():
-            (said, lei, aid, sn) = tuple(json.loads(acct.decode("utf-8")))
-            self.witq.query(src=self.hab.pre, pre=aid)
+        for acct in self.vdb.accts.getItemIter():
+            self.witq.query(src=self.hab.pre, pre=acct.aid)
 
-            kever = self.hby.kevers[aid]
-            if kever.sner.num > sn:
-                print("Identifier rotation detected")
-                creder = self.reger.creds.get(keys=(said,))
-                match creder.schema:
-                    case Schema.ECR_SCHEMA_SAID:
-                        user = creder.subject["LEI"]
-                    case _:
-                        continue
+            kever = self.hby.kevers[acct.aid]
+            #TODO update acct to include sequence number
+            # if kever.sner.num > sn:
+            #     print("Identifier rotation detected")
+            #     creder = self.reger.creds.get(keys=(acct.said,))
+            #     match creder.schema:
+            #         case Schema.ECR_SCHEMA_SAID:
+            #             user = creder.subject["LEI"]
+            #         case _:
+            #             continue
 
-                self.vdb.accts.pin(keys=(aid,), val=(said, creder.subject["LEI"], aid, kever.sner))
+            #     acct = Account(acct.aid, acct.said, user)
+            #     self.vdb.accts.pin(keys=(acct.aid,), val=acct)
 

@@ -216,14 +216,10 @@ class AuthorizationResourceEnd:
             rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
             return
         
-        # dAcct = acct.decode("utf-8")
-        jAcct = json.loads(acct)
-        (said,lei) = tuple(jAcct)
-
         body = dict(
             aid=aid,
-            said=said,
-            msg=f"AID w/ lei ${lei} presented valid credential"
+            said=acct.said,
+            msg=f"AID w/ lei {acct.lei} presented valid credential"
         )
 
         rep.status = falcon.HTTP_OK

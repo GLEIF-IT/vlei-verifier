@@ -6,29 +6,20 @@ import re
 import tempfile
 import traceback
 import zipfile
-from collections import namedtuple
 from dataclasses import asdict
-from fileinput import filename
-from hashlib import sha256
 
 import falcon
 from keri import help
 from hio.base import doing
 from keri import kering
-from keri.core import coring, Siger, MtrDex
+from keri.core import Siger
 
-from verifier.core.basing import ReportStats
+from verifier.core.basing import delete_upload_status, ReportStats, ReportStatus, save_upload_status, UploadStatus
 from verifier.core.utils import DigerBuilder
 
 # help.ogler.level = logging.getLevelName("DEBUG")
 # logger = help.ogler.getLogger()
 logger = help.ogler.getLogger("ReportVerifier", level=logging.DEBUG)
-
-# Report Statuses.
-Reportage = namedtuple("Reportage", "accepted verified failed")
-
-# Referencable report status enumeration
-ReportStatus = Reportage(accepted="accepted", verified="verified", failed="failed")
 
 AID = "aid"
 DIGEST = "digest"
@@ -90,7 +81,7 @@ class Filer:
         self.vdb = vdb
         logger.info("Report status filer initialized")
 
-    def create(self, aid, dig, lei, filename, typ, stream):
+    def create(self, aid: str, dig: str, lei: str, filename: str, typ: str, stream):
         """ Create a new file upload with initial Accepted status.
 
         This method creates the report upload status object and queues it for report verification processing
@@ -103,7 +94,7 @@ class Filer:
             stream (File): file like stream object to load the report data from
 
         """
-        self.vdb.delTopVal(db=self.vdb.imgs, key=dig.encode("utf-8"))
+        self.vdb.delTopVal(db=self.vdb.imgs, top=dig.encode("utf-8"))
         stats = ReportStats(
             submitter=aid,
             filename=filename,
@@ -126,7 +117,7 @@ class Filer:
             stats.size += len(chunk)
 
         if not diger.verify(report):
-            raise kering.ValidationError(f"Report digets({dig} verification failed)")
+            raise kering.ValidationError(f"Report digest {dig} verification failed")
 
         with tempfile.TemporaryFile("w+b") as tf:
             tf.write(report)
@@ -156,7 +147,7 @@ class Filer:
                         raise kering.ValidationError(f"{e}")
 
         self.vdb.rpts.add(keys=(aid,), val=diger)
-        self.vdb.stts.add(keys=(stats.status,), val=diger)
+        save_upload_status(self.vdb, stats.status, diger.qb64)
         self.vdb.stats.pin(keys=(diger.qb64,), val=stats)
 
     def get(self, dig):
@@ -188,14 +179,17 @@ class Filer:
             yield bytes(chunk)
             idx += 1
 
-    def getAcceptedIter(self):
-        """ Generator that yields Diger values for all reports currently in Accepted status
+    def getAccepted(self):
+        """ Generator that yields SAID values for all reports currently in Accepted status
 
         """
-        for diger in self.vdb.stts.getIter(keys=(ReportStatus.accepted,)):
-            yield diger
+        statuses = self.vdb.stts.get(keys=(ReportStatus.accepted,))
+        if statuses:
+            return statuses.saids
+        else:
+            return []
 
-    def update(self, diger, status, msg=None):
+    def update(self, said, prevStatus, newStatus, msg=None):
         """ Set new report status for report identifier
 
         Parameters:
@@ -204,17 +198,16 @@ class Filer:
             msg (str): optional status message for report
 
         """
-        if (stats := self.vdb.stats.get(keys=(diger.qb64,))) is None:
+        if (stats := self.vdb.stats.get(keys=(said,))) is None:
             return False
 
-        self.vdb.stts.rem(keys=(stats.status,), val=diger)
-
-        stats.status = status
+        stats.status = newStatus
         if msg is not None:
             stats.message = msg
 
-        self.vdb.stts.add(keys=(stats.status,), val=diger)
-        self.vdb.stats.pin(keys=(diger.qb64,), val=stats)
+        delete_upload_status(self.vdb, prevStatus, said)
+        save_upload_status(self.vdb, newStatus, said)
+        self.vdb.stats.pin(keys=(said,), val=stats)
 
 
 class ReportResourceEnd:
@@ -275,15 +268,13 @@ class ReportResourceEnd:
         if acct is None:
             raise falcon.HTTPForbidden(description=f"identifier {aid} has no valid credential for access")
 
-        (said, aLEI) = tuple(json.loads(acct))
-
         stats = self.filer.get(dig)
         if stats is None:
             raise falcon.HTTPNotFound(description=f"report {dig} not found")
 
-        (sList, fLEI) = stats
-        if (fLEI != aLEI):
-            raise falcon.HTTPNotFound(description=f"report {dig} LEI {fLEI} not available to this user LEI {aLEI}")
+        sacct = self.vdb.accts.get(keys=(stats.submitter,))
+        if (acct.lei != sacct.lei):
+            raise falcon.HTTPNotFound(description=f"report {dig} LEI {sacct.lei} not available to this user LEI {acct.lei}")
 
         rep.status = falcon.HTTP_200
         rep.data = json.dumps(asdict(stats)).encode("utf-8")
@@ -327,17 +318,14 @@ class ReportResourceEnd:
         if acct is None:
             raise falcon.HTTPForbidden(description=f"identifier {aid} has no valid credential for access")
 
-        (said, lei) = tuple(json.loads(acct.decode("utf-8")))
-
         form = req.get_media()
         upload = False
         for part in form:
             if part.name == "upload":
                 try:
                     logger.info(f"Upload passed AID checks, Creating filer  {part.filename}:\n "
-                      f"\tType={part.contentType}\n"
-                      f"\tSize={part.size}")
-                    self.filer.create(aid=aid, dig=dig, lei=lei, filename=part.secure_filename, typ=part.content_type,
+                      f"\tType={part.content_type}\n")
+                    self.filer.create(aid=aid, dig=dig, lei=acct.lei, filename=part.secure_filename, typ=part.content_type,
                                     stream=part.stream)
                     upload = True
                 except Exception as e:
@@ -345,7 +333,7 @@ class ReportResourceEnd:
                     raise falcon.HTTPBadRequest(description=f"{str(e)}")
 
         if not upload:
-            raise falcon.HTTPBadRequest(description=f"upload file content type must be multipart/form-data")
+            raise falcon.HTTPBadRequest(description=f"upload file content type must be multipart/form-data: {str(form)}")
 
         rep.status = falcon.HTTP_202
         rep.data = json.dumps(dict(msg=f"Upload {dig} received from {aid}")).encode("utf-8")
@@ -387,15 +375,18 @@ class ReportVerifier(doing.Doer):
             tyme (float): relative cycle time
 
         """
-        for diger in self.filer.getAcceptedIter():
+        changes = []
+        saids = self.filer.getAccepted()
+        if len(saids) > 0:
+            said = saids.pop()
             try:
-                stats = self.vdb.stats.get(keys=(diger.qb64,))
+                stats = self.vdb.stats.get(keys=(said,))
                 logger.info(f"Processing {stats.filename}:\n "
-                      f"\tType={stats.contentType}\n"
-                      f"\tSize={stats.size}")
-                
+                    f"\tType={stats.contentType}\n"
+                    f"\tSize={stats.size}")
+            
                 with tempfile.TemporaryFile("w+b") as tf:
-                    for chunk in self.filer.getData(diger.qb64):
+                    for chunk in self.filer.getData(said):
                         tf.write(chunk)
 
                     tf.seek(0)
@@ -426,20 +417,16 @@ class ReportVerifier(doing.Doer):
                             logger.info(f"processing signature {signature}")
                             try:
                                 sigAid = signature[AID]
-                                sigAcct = self.accts.get(keys=(sigAid,))
+                                sigAcct = self.vdb.accts.get(keys=(sigAid,))
                                 if sigAcct == None:
                                     raise kering.ValidationError("signature from AID that is not a known submitter")
 
-                                (sigSaider, sigLEI) = tuple(json.loads(sigAcct.decode("utf-8")))
-
-                                subAcct = self.accts.get(keys=(stats.submitter,))
+                                subAcct = self.vdb.accts.get(keys=(stats.submitter,))
                                 if subAcct == None:
                                     raise kering.ValidationError(f"submitter does not have a valid account")
                                 
-                                (subSaider, subLEI) = tuple(json.loads(subAcct.decode("utf-8")))
-                                
-                                if sigLEI != subLEI:
-                                    raise kering.ValidationError(f"submitter LEI {subLEI} is not the same as signer LEI {sigLEI}")
+                                if sigAcct.lei != subAcct.lei:
+                                    raise kering.ValidationError(f"submitter LEI {subAcct.lei} is not the same as signer LEI {sigAcct.lei}")
 
                                 # Now ensure we know who this AID is and that we have their key state
                                 if sigAid not in self.hby.kevers:
@@ -480,19 +467,22 @@ class ReportVerifier(doing.Doer):
                         diff = set(files) - set(verfed)
                         if len(diff) == 0:
                             msg = f"All {len(files)} files in report package, submitted by {stats.submitter}, have been signed by " \
-                                    f"known AIDs from the LEI {subLEI}."
-                            self.filer.update(diger, ReportStatus.verified, msg)
+                                    f"known AIDs from the LEI {subAcct.lei}."
+                            changes.append((said, ReportStatus.verified, msg))
                             logger.info(f"Added verified status message {msg}")
                         else:
                             msg = f"{len(diff)} files from report package missing valid signature {diff}"
-                            self.filer.update(diger, ReportStatus.failed, msg)
+                            changes.append((said, ReportStatus.failed, msg))
                             logger.info(f"Added failed status message {msg}")
-
 
             except (kering.ValidationError, zipfile.BadZipFile) as e:
                 msg = e.args[0]
-                self.filer.update(diger, ReportStatus.failed, msg)
+                changes.append((said, ReportStatus.failed, msg))
                 logger.info(f"Added failed status message {msg}")
+                
+        for said, status, msg in changes:
+            self.filer.update(said, ReportStatus.accepted, status, msg)
+            logger.info(f"Changed {said} {status} status message {msg}")
                 
 class FileProcessor:
     
