@@ -5,7 +5,9 @@ verifier.core.basing module
 
 Database support
 """
+from collections import namedtuple
 from dataclasses import dataclass
+from typing import List
 
 from keri.core import coring
 from keri.db import dbing, subing, koming
@@ -21,7 +23,6 @@ class Account:
 @dataclass
 class ReportStats:
     """ Report statistics dataclass for tracking"""
-
     submitter: str = None
     filename: str = None
     status: str = None
@@ -29,6 +30,47 @@ class ReportStats:
     size: int = 0
     message: str = ""
 
+# Report Statuses.
+Reportage = namedtuple("Reportage", "accepted verified failed")
+
+# Referencable report status enumeration
+ReportStatus = Reportage(accepted="accepted", verified="verified", failed="failed")
+
+@dataclass
+class UploadStatus:
+    """ Upload status dataclass for tracking"""
+    status: str = None
+    saids: List[str] = None
+
+def delete_upload_status(vdb, status: ReportStats, said: str):
+    """
+    Add status to the status database
+
+    Parameters:
+        status (str): status of the report
+        said (str): SAID of the report
+
+    """
+    statuses = vdb.stts.get(keys=(status,))
+    if statuses and said in statuses.saids:
+        statuses.saids.remove(said)
+        vdb.stts.pin(keys=(status,), val=statuses)
+    
+def save_upload_status(vdb, status: ReportStats, said: str):
+    """
+    Add status to the status database
+
+    Parameters:
+        status (str): status of the report
+        said (str): SAID of the report
+
+    """
+    statuses = vdb.stts.get(keys=(status,))
+    if not statuses:
+        statuses = UploadStatus(status=status, saids=[])
+    statuses.saids.append(said)
+    statuses.saids = list(set(statuses.saids))
+    vdb.stts.pin(keys=(status,), val=statuses)
 
 class VerifierBaser(dbing.LMDBer):
     """
@@ -93,7 +135,7 @@ class VerifierBaser(dbing.LMDBer):
         self.rpts = CesrIoSetSuber(db=self, subkey='rpts.', klas=coring.Diger)
 
         # Report DIGs indexed by status
-        self.stts = CesrIoSetSuber(db=self, subkey='stts.', klas=coring.Diger)
+        self.stts = koming.Komer(db=self, subkey='stts.', schema=UploadStatus)
 
         # Data chunks for uploaded report, indexed by DIG plus chunk index
         self.imgs = self.env.open_db(key=b'imgs.')

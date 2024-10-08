@@ -6,7 +6,6 @@ import re
 import tempfile
 import traceback
 import zipfile
-from collections import namedtuple
 from dataclasses import asdict
 
 import falcon
@@ -15,18 +14,12 @@ from hio.base import doing
 from keri import kering
 from keri.core import Siger
 
-from verifier.core.basing import ReportStats
+from verifier.core.basing import delete_upload_status, ReportStats, ReportStatus, save_upload_status, UploadStatus
 from verifier.core.utils import DigerBuilder
 
 # help.ogler.level = logging.getLevelName("DEBUG")
 # logger = help.ogler.getLogger()
 logger = help.ogler.getLogger("ReportVerifier", level=logging.DEBUG)
-
-# Report Statuses.
-Reportage = namedtuple("Reportage", "accepted verified failed")
-
-# Referencable report status enumeration
-ReportStatus = Reportage(accepted="accepted", verified="verified", failed="failed")
 
 AID = "aid"
 DIGEST = "digest"
@@ -154,7 +147,7 @@ class Filer:
                         raise kering.ValidationError(f"{e}")
 
         self.vdb.rpts.add(keys=(aid,), val=diger)
-        self.vdb.stts.add(keys=(stats.status,), val=diger)
+        save_upload_status(self.vdb, stats.status, diger.qb64)
         self.vdb.stats.pin(keys=(diger.qb64,), val=stats)
 
     def get(self, dig):
@@ -186,14 +179,17 @@ class Filer:
             yield bytes(chunk)
             idx += 1
 
-    def getAcceptedIter(self):
-        """ Generator that yields Diger values for all reports currently in Accepted status
+    def getAccepted(self):
+        """ Generator that yields SAID values for all reports currently in Accepted status
 
         """
-        for diger in self.vdb.stts.getIter(keys=(ReportStatus.accepted,)):
-            yield diger
+        statuses = self.vdb.stts.get(keys=(ReportStatus.accepted,))
+        if statuses:
+            return statuses.saids
+        else:
+            return []
 
-    def update(self, diger, status, msg=None):
+    def update(self, said, prevStatus, newStatus, msg=None):
         """ Set new report status for report identifier
 
         Parameters:
@@ -202,17 +198,16 @@ class Filer:
             msg (str): optional status message for report
 
         """
-        if (stats := self.vdb.stats.get(keys=(diger.qb64,))) is None:
+        if (stats := self.vdb.stats.get(keys=(said,))) is None:
             return False
 
-        # self.vdb.stts.rem(keys=(stats.status,), val=diger)
-
-        stats.status = status
+        stats.status = newStatus
         if msg is not None:
             stats.message = msg
 
-        self.vdb.stts.add(keys=(stats.status,), val=diger)
-        self.vdb.stats.pin(keys=(diger.qb64,), val=stats)
+        delete_upload_status(self.vdb, prevStatus, said)
+        save_upload_status(self.vdb, newStatus, said)
+        self.vdb.stats.pin(keys=(said,), val=stats)
 
 
 class ReportResourceEnd:
@@ -381,15 +376,17 @@ class ReportVerifier(doing.Doer):
 
         """
         changes = []
-        for diger in self.filer.getAcceptedIter():
+        saids = self.filer.getAccepted()
+        if len(saids) > 0:
+            said = saids.pop()
             try:
-                stats = self.vdb.stats.get(keys=(diger.qb64,))
+                stats = self.vdb.stats.get(keys=(said,))
                 logger.info(f"Processing {stats.filename}:\n "
                     f"\tType={stats.contentType}\n"
                     f"\tSize={stats.size}")
             
                 with tempfile.TemporaryFile("w+b") as tf:
-                    for chunk in self.filer.getData(diger.qb64):
+                    for chunk in self.filer.getData(said):
                         tf.write(chunk)
 
                     tf.seek(0)
@@ -471,21 +468,21 @@ class ReportVerifier(doing.Doer):
                         if len(diff) == 0:
                             msg = f"All {len(files)} files in report package, submitted by {stats.submitter}, have been signed by " \
                                     f"known AIDs from the LEI {subAcct.lei}."
-                            changes.append((diger, ReportStatus.verified, msg))
+                            changes.append((said, ReportStatus.verified, msg))
                             logger.info(f"Added verified status message {msg}")
                         else:
                             msg = f"{len(diff)} files from report package missing valid signature {diff}"
-                            changes.append((diger, ReportStatus.failed, msg))
+                            changes.append((said, ReportStatus.failed, msg))
                             logger.info(f"Added failed status message {msg}")
 
             except (kering.ValidationError, zipfile.BadZipFile) as e:
                 msg = e.args[0]
-                changes.append((diger, ReportStatus.failed, msg))
+                changes.append((said, ReportStatus.failed, msg))
                 logger.info(f"Added failed status message {msg}")
                 
-        for diger, status, msg in changes:
-            self.filer.update(diger, status, msg)
-            logger.info(f"Changed {diger} {status} status message {msg}")
+        for said, status, msg in changes:
+            self.filer.update(said, ReportStatus.accepted, status, msg)
+            logger.info(f"Changed {said} {status} status message {msg}")
                 
 class FileProcessor:
     
