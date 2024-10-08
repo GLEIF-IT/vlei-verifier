@@ -258,8 +258,8 @@ def get_da_cred(issuer, schema, registry):
 
     return creder   
 
-def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge):
-    sad = dict(get_ecr_data())
+def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str):
+    sad = dict(get_ecr_data(lei))
     sad["AID"]=f'{aid}'
     
     _, ecr_auth = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
@@ -316,17 +316,17 @@ def get_ecr_edge(auth_dig, auth_schema):
   
     return ecr
 
-def get_ecr_data():
+def get_ecr_data(lei: str):
     return dict(
         d="",
         personLegalName="Bank User",
         engagementContextRole="EBA Data Submitter",
-        LEI=f"{LEI1}"
+        LEI=f"{lei}"
     )
 
-def get_ecr_cred(issuer, recipient, schema, registry, sedge):
+def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str):
 
-    sad = get_ecr_data()
+    sad = get_ecr_data(lei)
 
     _, ecr = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
     
@@ -356,11 +356,11 @@ def get_ecr_cred(issuer, recipient, schema, registry, sedge):
 
     return cred
 
-def get_lei_cred(issuer, recipient, schema, registry, sedge):
+def get_lei_cred(issuer, recipient, schema, registry, sedge, lei: str):
     
     lei = dict(
         d="",
-        LEI=f"{LEI1}"
+        LEI=f"{lei}"
     )
 
     _, sad = coring.Saider.saidify(sad=lei, label=coring.Saids.d)
@@ -387,11 +387,11 @@ def get_lei_cred(issuer, recipient, schema, registry, sedge):
 
     return cred
 
-def get_qvi_cred(issuer, recipient, schema, registry):
+def get_qvi_cred(issuer, recipient, schema, registry, lei: str):
     
     qvi = dict(
         d="",
-        LEI=f"{LEI1}"
+        LEI=f"{lei}"
     )
 
     _, sad = coring.Saider.saidify(sad=qvi, label=coring.Saids.d)

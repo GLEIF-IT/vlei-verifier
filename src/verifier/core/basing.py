@@ -11,6 +11,12 @@ from keri.core import coring
 from keri.db import dbing, subing, koming
 from keri.db.subing import CesrIoSetSuber
 
+@dataclass
+class Account:
+    """ Account dataclass for tracking"""
+    aid: str = None
+    said: str = None
+    lei: str = None
 
 @dataclass
 class ReportStats:
@@ -81,7 +87,7 @@ class VerifierBaser(dbing.LMDBer):
         self.rev = subing.CesrSuber(db=self, subkey='rev.', klas=coring.Dater)
 
         # presentations with resolved credentials are granted access
-        self.accts = subing.Suber(db=self, subkey='accts', klas=(coring.Saider,))
+        self.accts = koming.Komer(db=self, subkey='accts', schema=Account)
 
         # Report database linking AID of uploader to DIG of uploaded report
         self.rpts = CesrIoSetSuber(db=self, subkey='rpts.', klas=coring.Diger)
