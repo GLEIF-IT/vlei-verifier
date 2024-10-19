@@ -1,10 +1,13 @@
+import datetime
+import falcon
 import json
 
-import falcon
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
-from verifier.core.authorizing import Schema
+from verifier.core.basing import CredProcessState
 
+CRYPT_INVALID = "Credential cryptographically invalid"
+CRYPT_VALID = "Credential cryptographically valid"
 
 def setup(app, hby, vdb, reger, local=False):
     """ Set up verifying endpoints to process vLEI credential verifications
@@ -135,7 +138,9 @@ class PresentationResourceEndpoint:
         saider = coring.Saider(qb64=said)
         cred_attrs = creder.sad['a']
         creds = None
+        aid = ""
         if 'i' in cred_attrs:
+            # use issuee AID
             aid = cred_attrs['i']
             # clear any previous login, now that a valid credential has been presented
             self.vdb.accts.rem(keys=(aid,))
@@ -144,16 +149,16 @@ class PresentationResourceEndpoint:
             saids = self.vry.reger.subjs.get(keys=aid,)
             creds = self.vry.reger.cloneCreds(saids, self.hby.db)
         else:
+            # no issuee AID, use issuer
+            aid = creder.sad['i']
             creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
                     
-        print(f"Credential {said} presented.")
+        print(f"Credential {said} presented is cryptographically valid.")
 
-        now = coring.Dater()
-
-        self.vdb.iss.pin(keys=(saider.qb64,), val=now)
-
+        cred_state = CredProcessState(said=said, state=CRYPT_VALID)
+        self.vdb.iss.pin(keys=(aid,), val=cred_state)
         rep.status = falcon.HTTP_ACCEPTED
-        rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} is a valid credential ", 
+        rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} from {aid} is {cred_state.state} ", 
                                     lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode("utf-8")
         return
 
@@ -213,8 +218,13 @@ class AuthorizationResourceEnd:
         acct = self.vdb.accts.get(keys=(aid,))
         if (acct) is None:
             rep.status = falcon.HTTP_UNAUTHORIZED
-            rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
-            return
+            state: CredProcessState = self.vdb.iss.get(keys=(aid,))
+            if state is None:
+                rep.data = json.dumps(dict(msg=f"identifier {aid} has no access and no authorization being processed")).encode("utf-8")
+                return
+            else:
+                rep.data = json.dumps(dict(msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}")).encode("utf-8")
+                return
         
         body = dict(
             aid=aid,
