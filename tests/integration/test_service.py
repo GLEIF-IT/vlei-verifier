@@ -14,7 +14,7 @@ import verifier.core.authorizing as authorizing
 import verifier.core.reporting as reporting
 
 host = "localhost"
-port = 7676
+port = 7666
 url = f"http://{host}:{port}"
 
 def test_service_ecr(seeder):        

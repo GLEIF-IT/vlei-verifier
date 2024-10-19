@@ -6,13 +6,26 @@ verifier.core.basing module
 Database support
 """
 from collections import namedtuple
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import List
 
 from keri.core import coring
 from keri.db import dbing, subing, koming
 from keri.db.subing import CesrIoSetSuber
+from keri.help.helping import nowUTC
 
+@dataclass
+class CredProcessState:
+    said: str = None
+    state: str = None
+    date: str = nowUTC().isoformat()
+    
+    def __iter__(self):
+        return iter(asdict(self))
+
+# @dataclass
+# class CredProcessStates:
+#     states: List[CredProcessState] = []
 @dataclass
 class Account:
     """ Account dataclass for tracking"""
@@ -71,6 +84,16 @@ def save_upload_status(vdb, status: ReportStats, said: str):
     statuses.saids.append(said)
     statuses.saids = list(set(statuses.saids))
     vdb.stts.pin(keys=(status,), val=statuses)
+    
+# def save_cred_state(vdb, state: CredProcessState, said: str, aid: str):
+#     """
+#     Add status to the status database
+
+#     Parameters:
+#         status (str): status of the report
+#         said (str): SAID of the report
+
+#     """
 
 class VerifierBaser(dbing.LMDBer):
     """
@@ -123,7 +146,7 @@ class VerifierBaser(dbing.LMDBer):
         super(VerifierBaser, self).reopen(**kwa)
 
         # presentations that are waiting for the credential to be received and parsed
-        self.iss = subing.CesrSuber(db=self, subkey='iss.', klas=coring.Dater)
+        self.iss = koming.Komer(db=self, subkey='iss.', schema=CredProcessState)
 
         # revocations that are waiting for the TEL event to be received and processed
         self.rev = subing.CesrSuber(db=self, subkey='rev.', klas=coring.Dater)

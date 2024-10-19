@@ -16,7 +16,7 @@ def test_vdb():
     assert baser.env.path() == baser.path
     assert os.path.exists(baser.path)
 
-    assert isinstance(baser.iss, subing.CesrSuber)
+    assert isinstance(baser.iss, koming.Komer)
     assert isinstance(baser.rev, subing.CesrSuber)
     assert isinstance(baser.accts, koming.Komer)
     assert isinstance(baser.rpts, subing.CesrIoSetSuber)
