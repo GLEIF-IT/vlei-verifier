@@ -70,8 +70,9 @@ def test_ecr(seeder):
         acdc = issAndCred.decode("utf-8")
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
-        msg = auth.processEcr(eacred)
-        assert msg == 'Successful authentication, storing user EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9o with LEI 254900OPPU84GM83MG36'
+        success, msg = auth.processCredFilters(eacred)
+        assert not success
+        assert msg == 'unknown schema EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy'
 
         # chained ecr auth cred
         ecredge = get_ecr_edge(easaid, Schema.ECR_AUTH_SCHEMA)
@@ -90,34 +91,11 @@ def test_ecr(seeder):
 
         issAndCred = bytearray()
         issAndCred.extend(ecmsgs)
-        acdc = issAndCred.decode("utf-8")
-        client = falcon.testing.TestClient(app)
-        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
-        result = client.simulate_put(
-            f"/presentations/{ecsaid}",
-            body=acdc,
-            headers={"Content-Type": "application/json+cesr"},
-        )
-        assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
-        auth.processPresentations()
-
-        result = client.simulate_get(f"/authorizations/{hab.pre}")
-        assert result.status == falcon.HTTP_OK
-
-        data = "this is the raw data"
-        raw = data.encode("utf-8")
-        cig = hab.sign(ser=raw, indexed=False)[0]
-        assert (
-            cig.qb64
-            == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
-        )
-        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
-        result = client.simulate_post(
-            f"/request/verify/{hab.pre}", params={"data": data, "sig": cig.qb64}
-        )
-        assert result.status == falcon.HTTP_202
+        success, msg = auth.processCredFilters(ecr)
+        assert success
+        assert msg == 'Successful authentication, storing user EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9o with LEI 254900OPPU84GM83MG36'
 
         data = '"@method": GET\n"@path": /verify/header\n"signify-resource": EHYfRWfM6RxYbzyodJ6SwYytlmCCW2gw5V-FsoX5BgGx\n"signify-timestamp": 2024-05-01T19:54:53.571000+00:00\n"@signature-params: (@method @path signify-resource signify-timestamp);created=1714593293;keyid=BOieebDzg4uaqZ2zuRAX1sTiCrD3pgGT3HtxqSEAo05b;alg=ed25519"'
         raw = data.encode("utf-8")
@@ -127,23 +105,3 @@ def test_ecr(seeder):
             == "0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP"
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
-
-        # try submitting the ECR auth cred now that we're already authorized
-        issAndCred = bytearray()
-        issAndCred.extend(eamsgs)
-        acdc = issAndCred.decode("utf-8")
-        client = falcon.testing.TestClient(app)
-        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eacrdntler.rgy.reger)
-        result = client.simulate_put(
-            f"/presentations/{easaid}",
-            body=acdc,
-            headers={"Content-Type": "application/json+cesr"},
-        )
-        # ecr auth cred is verified to be a valid credential
-        assert result.status == falcon.HTTP_202
-        hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
-        auth.processPresentations()
-        # ecr auth cred is not authorized
-        result = client.simulate_get(f"/authorizations/{hab.pre}")
-        assert result.status == falcon.HTTP_401

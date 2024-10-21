@@ -147,7 +147,7 @@ class Authorizer:
             creder (Creder):  Serializable credential object
 
         """
-        res = False, None
+        res = False, f"Cred filters not processed"
         match creder.schema:
             case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
                 # passed schema check
@@ -164,13 +164,13 @@ class Authorizer:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
             elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
-                msg = f"{creder.attrib["engagementContextRole"]} in not a valid submitter role"
+                res = False, f"{creder.attrib["engagementContextRole"]} in not a valid submitter role"
             else:            
                 acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
-                res = False, f"Successful authentication, storing user {creder.attrib["i"]} with LEI {creder.attrib["LEI"]}"
+                res = True, f"Successful authentication, storing user {creder.attrib["i"]} with LEI {creder.attrib["LEI"]}"
                 self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
-        print(msg)
-        return msg
+        print(f"Cred filter status {res[0]}, {res[1]}")
+        return res
 
     def processRevocations(self):
         """Loop over database of credential revocations.
