@@ -265,14 +265,11 @@ class AuthorizationResourceEnd:
 
         """
         rep.content_type = "application/json"
-
+        acct = self.vdb.accts.get(keys=(aid,))
         if aid not in self.hby.kevers:
             rep.status = falcon.HTTP_UNAUTHORIZED
             rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
-            return
-
-        acct = self.vdb.accts.get(keys=(aid,))
-        if (acct) is None:
+        elif acct is None:
             rep.status = falcon.HTTP_UNAUTHORIZED
             state: CredProcessState = self.vdb.iss.get(keys=(aid,))
             if state is None:
@@ -281,23 +278,22 @@ class AuthorizationResourceEnd:
                         msg=f"identifier {aid} has no access and no authorization being processed"
                     )
                 ).encode("utf-8")
-                return
             else:
                 rep.data = json.dumps(
                     dict(
                         msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}"
                     )
                 ).encode("utf-8")
-                return
+        else:
+            body = dict(
+                aid=aid,
+                said=acct.said,
+                lei=acct.lei,
+                msg=f"AID {aid} w/ lei {acct.lei} presented valid credential",
+            )
 
-        body = dict(
-            aid=aid,
-            said=acct.said,
-            msg=f"AID {aid} w/ lei {acct.lei} presented valid credential",
-        )
-
-        rep.status = falcon.HTTP_OK
-        rep.data = json.dumps(body).encode("utf-8")
+            rep.status = falcon.HTTP_OK
+            rep.data = json.dumps(body).encode("utf-8")
         return
 
 

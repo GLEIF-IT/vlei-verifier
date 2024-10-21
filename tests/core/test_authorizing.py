@@ -72,7 +72,7 @@ def test_ecr(seeder):
         auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
         success, msg = auth.processCredFilters(eacred)
         assert not success
-        assert msg == 'unknown schema EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy'
+        assert msg == f'unknown schema {eacred.schema}'
 
         # chained ecr auth cred
         ecredge = get_ecr_edge(easaid, Schema.ECR_AUTH_SCHEMA)
