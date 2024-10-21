@@ -4,13 +4,10 @@ import json
 
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
-from verifier.core.basing import CredProcessState
-
-CRYPT_INVALID = "Credential cryptographically invalid"
-CRYPT_VALID = "Credential cryptographically valid"
+from verifier.core.basing import CRYPT_INVALID, CRYPT_VALID, CredProcessState, cred_age_off
 
 def setup(app, hby, vdb, reger, local=False):
-    """ Set up verifying endpoints to process vLEI credential verifications
+    """Set up verifying endpoints to process vLEI credential verifications
 
     Parameters:
         app (App): Falcon app to register endpoints against
@@ -27,7 +24,7 @@ def setup(app, hby, vdb, reger, local=False):
 
 
 def loadEnds(app, hby, vdb, tvy, vry):
-    """ Load and map endpoints to process vLEI credential verifications
+    """Load and map endpoints to process vLEI credential verifications
 
     Parameters:
         app (App): Falcon app to register endpoints against
@@ -51,7 +48,7 @@ def loadEnds(app, hby, vdb, tvy, vry):
 
 
 class PresentationResourceEndpoint:
-    """ Credential presentation resource endpoint class
+    """Credential presentation resource endpoint class
 
     This class allows for a PUT to a credential SAID specific endpoint to trigger credential presentation
     verification.
@@ -59,7 +56,7 @@ class PresentationResourceEndpoint:
     """
 
     def __init__(self, hby, vdb, tvy, vry):
-        """ Create credential presentation resource endpoint instance
+        """Create credential presentation resource endpoint instance
 
         Parameters:
             hby (Habery): Database environment for exposed KERI AIDs
@@ -74,7 +71,7 @@ class PresentationResourceEndpoint:
         self.vry = vry
 
     def on_put(self, req, rep, said):
-        """  Credential Presentation Resource PUT Method
+        """Credential Presentation Resource PUT Method
 
         Parameters:
             req: falcon.Request HTTP request
@@ -108,18 +105,20 @@ class PresentationResourceEndpoint:
 
         if req.content_type not in ("application/json+cesr",):
             rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg=f"invalid content type={req.content_type} for VC presentation")).encode(
-                "utf-8")
+            rep.data = json.dumps(
+                dict(msg=f"invalid content type={req.content_type} for VC presentation")
+            ).encode("utf-8")
             return
 
         ims = req.bounded_stream.read()
 
-        self.vry.cues.clear()
+        if len(self.vry.cues) > 0:
+            rep.status = falcon.HTTP_SERVICE_UNAVAILABLE
+            rep.data = json.dumps(
+                dict(msg=f"Verifier is busy processing another VC presentation")
+            ).encode("utf-8")
 
-        parsing.Parser().parse(ims=ims,
-                               kvy=self.hby.kvy,
-                               tvy=self.tvy,
-                               vry=self.vry)
+        parsing.Parser().parse(ims=ims, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
 
         found = False
         saids = []
@@ -130,40 +129,97 @@ class PresentationResourceEndpoint:
                 if creder.said == said:
                     found = True
 
-        if not found: 
-            rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg=f"credential {said} from body of request did not verify")).encode("utf-8")
-            return
-        
-        saider = coring.Saider(qb64=said)
-        cred_attrs = creder.sad['a']
-        creds = None
-        aid = ""
-        if 'i' in cred_attrs:
-            # use issuee AID
-            aid = cred_attrs['i']
-            # clear any previous login, now that a valid credential has been presented
-            self.vdb.accts.rem(keys=(aid,))
-            print(f"{aid} account cleared after successful presentation, validation of new account will begin soon.")            
+        self.vry.cues.clear()
 
-            saids = self.vry.reger.subjs.get(keys=aid,)
+        if not found:
+            # TODO provide endpoint to check status of credential by said, to see crypt_invalid?
+            cred_state = CredProcessState(said=said, state=CRYPT_INVALID)
+            self.vdb.iss.pin(keys=(said,), val=cred_state)
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(
+                dict(
+                    msg=f"credential {said} from body of request did not cryptographically verify"
+                )
+            ).encode("utf-8")
+            return
+
+        saider = coring.Saider(qb64=said)
+        cred_attrs = creder.sad["a"]
+        creds = None
+        aid = None
+        saids = None
+        type = None
+        if "i" in cred_attrs:
+            # use issuee AID
+            aid = cred_attrs["i"]
+            saids = self.vry.reger.subjs.get(
+                keys=aid,
+            )
             creds = self.vry.reger.cloneCreds(saids, self.hby.db)
+            type = "issuee"
         else:
             # no issuee AID, use issuer
-            aid = creder.sad['i']
+            aid = creder.sad["i"]
+            saids = self.vry.reger.issus.get(
+                keys=aid,
+            )
             creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
-                    
-        print(f"Credential {said} presented is cryptographically valid.")
+            type = "issuer"
 
+        print(f"{aid} account cleared after successful presentation")
+        # clear any previous login, now that a valid credential has been presented
+        self.vdb.accts.rem(keys=(aid,))
+
+        print(f"Credential {said} presented for {aid} is cryptographically valid.")
         cred_state = CredProcessState(said=said, state=CRYPT_VALID)
         self.vdb.iss.pin(keys=(aid,), val=cred_state)
+        self.vdb.iss.pin(keys=(said,), val=cred_state)
         rep.status = falcon.HTTP_ACCEPTED
-        rep.data = json.dumps(dict(creds=json.dumps(creds), msg=f"{said} from {aid} is {cred_state.state} ", 
-                                    lei=creder.sad['a'].get('LEI'), aid=creder.sad['a'].get('i'))).encode("utf-8")
+        rep.data = json.dumps(
+            dict(
+                creds=json.dumps(creds),
+                msg=f"{said} for {aid} as {type} is {cred_state.state}",
+            )
+        ).encode("utf-8")
         return
 
+    def on_get(self, req, rep, said):
+        """Loop over any credential presentations in the iss database.
+
+        Credential presentations are placed in the iss database and this loop processes them, first checking to see
+        if the credential has been cryptographically verified then applies the EBA specific business logic.
+
+        """
+
+        state: CredProcessState = self.vdb.iss.get(keys=(said,))
+        aged_off, state = cred_age_off(state, 600.0)
+        if state is None:
+            rep.status = falcon.HTTP_NO_CONTENT
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Cred {said} is not found: {cred_state.state}",
+                )
+            ).encode("utf-8")
+            return
+        elif aged_off:
+            rep.status = falcon.HTTP_RESET_CONTENT
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Cred {said} has aged_off: {state.state}",
+                )
+            ).encode("utf-8")
+            return
+        else:
+            rep.status = falcon.HTTP_ACCEPTED
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Cred {said} state is: {state.state}",
+                )
+            ).encode("utf-8")
+            return
+
 class AuthorizationResourceEnd:
-    """ Authroization resource endpoint
+    """Authroization resource endpoint
 
     This resource endpoint class provides a GET method for verifying if an AID has
      previously presented a valid vLEI ECR credential.
@@ -171,7 +227,7 @@ class AuthorizationResourceEnd:
     """
 
     def __init__(self, hby, vdb):
-        """ Create authorization resource endpoint
+        """Create authorization resource endpoint
 
         Parameters:
             hby (Habery): Database environment for exposed KERI AIDs
@@ -181,7 +237,7 @@ class AuthorizationResourceEnd:
         self.vdb = vdb
 
     def on_get(self, req, rep, aid):
-        """  Authorization Resource GET Method
+        """Authorization Resource GET Method
 
         Parameters:
             req: falcon.Request HTTP request
@@ -220,16 +276,24 @@ class AuthorizationResourceEnd:
             rep.status = falcon.HTTP_UNAUTHORIZED
             state: CredProcessState = self.vdb.iss.get(keys=(aid,))
             if state is None:
-                rep.data = json.dumps(dict(msg=f"identifier {aid} has no access and no authorization being processed")).encode("utf-8")
+                rep.data = json.dumps(
+                    dict(
+                        msg=f"identifier {aid} has no access and no authorization being processed"
+                    )
+                ).encode("utf-8")
                 return
             else:
-                rep.data = json.dumps(dict(msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}")).encode("utf-8")
+                rep.data = json.dumps(
+                    dict(
+                        msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}"
+                    )
+                ).encode("utf-8")
                 return
-        
+
         body = dict(
             aid=aid,
             said=acct.said,
-            msg=f"AID w/ lei {acct.lei} presented valid credential"
+            msg=f"AID {aid} w/ lei {acct.lei} presented valid credential",
         )
 
         rep.status = falcon.HTTP_OK
@@ -238,7 +302,7 @@ class AuthorizationResourceEnd:
 
 
 class RequestVerifierResourceEnd:
-    """ Request Verifier Resource endpoint class
+    """Request Verifier Resource endpoint class
 
     This class provides a POST method endpoint that validating HTTP request signatures for AIDs that have previously
     presented a valid vLEI credential.
@@ -246,7 +310,7 @@ class RequestVerifierResourceEnd:
     """
 
     def __init__(self, hby, vdb):
-        """ Create a request verifier resource endpoint class
+        """Create a request verifier resource endpoint class
 
         Parameters:
             hby (Habery): Database environment for exposed KERI AIDs
@@ -257,7 +321,7 @@ class RequestVerifierResourceEnd:
         self.vdb = vdb
 
     def on_post(self, req, rep, aid):
-        """  Request verifier resource POST method
+        """Request verifier resource POST method
 
         Parameters:
             req: falcon.Request HTTP request
@@ -291,7 +355,9 @@ class RequestVerifierResourceEnd:
         data = req.params.get("data")
         if data is None:
             rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg="request missing data parameter")).encode("utf-8")
+            rep.data = json.dumps(dict(msg="request missing data parameter")).encode(
+                "utf-8"
+            )
             return
 
         encoded_data = data.encode("utf-8")  # signature is based on encoded data
@@ -299,18 +365,24 @@ class RequestVerifierResourceEnd:
         sign = req.params.get("sig")
         if sign is None:
             rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg="request missing sig parameter")).encode("utf-8")
+            rep.data = json.dumps(dict(msg="request missing sig parameter")).encode(
+                "utf-8"
+            )
             return
 
         if aid not in self.hby.kevers:
             rep.status = falcon.HTTP_NOT_FOUND
-            rep.data = json.dumps(dict(msg=f"unknown {aid} used to sign header")).encode("utf-8")
+            rep.data = json.dumps(
+                dict(msg=f"unknown {aid} used to sign header")
+            ).encode("utf-8")
             return
 
         acct = self.vdb.accts.get(keys=(aid,))
         if acct is None:
             rep.status = falcon.HTTP_FORBIDDEN
-            rep.data = json.dumps(dict(msg=f"identifier {aid} has no valid credential for access")).encode("utf-8")
+            rep.data = json.dumps(
+                dict(msg=f"identifier {aid} has no valid credential for access")
+            ).encode("utf-8")
             return
 
         kever = self.hby.kevers[aid]
@@ -319,14 +391,20 @@ class RequestVerifierResourceEnd:
             cigar = coring.Cigar(qb64=sign)
         except Exception as ex:
             rep.status = falcon.HTTP_BAD_REQUEST
-            rep.data = json.dumps(dict(msg=f"{aid} provided invalid Cigar signature on encoded request data")).encode(
-                "utf-8")
+            rep.data = json.dumps(
+                dict(
+                    msg=f"{aid} provided invalid Cigar signature on encoded request data"
+                )
+            ).encode("utf-8")
             return
 
         if not verfers[0].verify(sig=cigar.raw, ser=encoded_data):
             rep.status = falcon.HTTP_UNAUTHORIZED
             rep.data = json.dumps(
-                dict(msg=f"{aid} signature (Cigar) verification failed on encoding of request data")).encode("utf-8")
+                dict(
+                    msg=f"{aid} signature (Cigar) verification failed on encoding of request data"
+                )
+            ).encode("utf-8")
             return
 
         rep.status = falcon.HTTP_ACCEPTED
@@ -341,5 +419,7 @@ class HealthEndpoint:
     def on_get(self, req, rep):
         rep.content_type = "application/json"
         rep.status = falcon.HTTP_OK
-        rep.data = json.dumps(dict(msg="vLEI verification service is healthy")).encode("utf-8")
+        rep.data = json.dumps(dict(msg="vLEI verification service is healthy")).encode(
+            "utf-8"
+        )
         return

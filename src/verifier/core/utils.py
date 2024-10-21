@@ -1,7 +1,6 @@
 from keri import kering
 from keri.core import MtrDex, coring
 
-
 class DigerBuilder:
     @staticmethod
     def sha256(dig):
