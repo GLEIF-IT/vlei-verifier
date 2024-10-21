@@ -126,19 +126,17 @@ class Authorizer:
                 cred_state = CredProcessState(said=state.said, state=AUTH_PENDING)
                 creder = self.reger.creds.get(keys=(state.said,))
                 # are there multiple creds for the same said?
-                match creder.schema:
-                    case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
-                        self.processEcr(creder)
-                        break
-                    case _:
-                        cred_state = CredProcessState(said=state.said, state=AUTH_FAIL)
+                res = self.processCredFilters(creder)
+                if(res[0]):
+                    cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS)
+                else:
+                    cred_state = CredProcessState(said=state.said, state=AUTH_FAIL)
             else:
-                # No need to process state.state == AUTH_EXPIRE or state.state == AUTH_FAIL or state.state == AUTH_REVOKED or state.state == AUTH_SUCCESS:
-
+                # No need to process state.state == CRYPT_INVALID or state.state == AUTH_EXPIRE or state.state == AUTH_FAIL or state.state == AUTH_REVOKED or state.state == AUTH_SUCCESS:
                 continue
             self.vdb.iss.pin(keys=(aid,), val=cred_state)
 
-    def processEcr(self, creder):
+    def processCredFilters(self, creder) -> (bool,str):
         """Process a fully verified engagement context role vLEI credential presentation
 
         1.  If the LEI filter is configured, ensure the LEI is in the list of acceptable LEIs
@@ -149,30 +147,30 @@ class Authorizer:
             creder (Creder):  Serializable credential object
 
         """
-        if creder.issuer not in self.hby.kevers:
-            print(f"unknown issuer {creder.issuer}")
-            return
+        res = False, None
+        match creder.schema:
+            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
+                # passed schema check
+                res = True, f"passed schema check"
+            case _:
+                res = False, f"unknown schema {creder.schema}"                        
 
-        issuee = creder.attrib["i"]
-        if issuee not in self.hby.kevers:
-            print(f"unknown issuee {issuee}")
-            return
-
-        LEI = creder.attrib["LEI"]
-        # only process LEI filter if LEI list has been configured
-        if len(self.leis) > 0 and LEI not in self.leis:
-            print(f"LEI: {LEI} not allowed")
-            return
-
-        role = creder.attrib["engagementContextRole"]
-
-        if role not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
-            print(f"{role} in not a valid submitter role")
-            return
-
-        acct = Account(issuee, creder.said, LEI)
-        print("Successful authentication, storing user.")
-        self.vdb.accts.pin(keys=(issuee,), val=acct)
+        if res[0]:
+            if creder.issuer not in self.hby.kevers:
+                res = False, f"unknown issuer {creder.issuer}"        
+            elif creder.attrib["i"] == None or creder.attrib["i"] not in self.hby.kevers:
+                print(f"unknown issuee {creder.attrib["i"]}")
+            elif len(self.leis) > 0 and creder.attrib["LEI"] not in self.leis:
+                # only process LEI filter if LEI list has been configured
+                res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
+            elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
+                msg = f"{creder.attrib["engagementContextRole"]} in not a valid submitter role"
+            else:            
+                acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
+                res = False, f"Successful authentication, storing user {creder.attrib["i"]} with LEI {creder.attrib["LEI"]}"
+                self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
+        print(msg)
+        return msg
 
     def processRevocations(self):
         """Loop over database of credential revocations.
