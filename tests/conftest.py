@@ -456,7 +456,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM
-        assert schemer.said == Schema.LEI_SCHEMA
+        assert schemer.said == Schema.LE_SCHEMA1
         db.schema.pin(schemer.said, schemer)
 
         # OLD: EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao
@@ -501,7 +501,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs
-        assert schemer.said == Schema.QVI_SCHEMA
+        assert schemer.said == Schema.QVI_SCHEMA1
         db.schema.pin(schemer.said, schemer)
 
         sad = {
@@ -829,7 +829,7 @@ class DbSeed:
                             "s": {
                             "description": "SAID of required schema of the credential pointed to by this node",
                             "type": "string",
-                            "const": f"{Schema.ECR_AUTH_SCHEMA}"
+                            "const": f"{Schema.ECR_AUTH_SCHEMA2}"
                             },
                             "o": {
                             "description": "Operator indicating this node is the issuer",
@@ -1174,7 +1174,7 @@ class DbSeed:
         _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
         schemer = scheming.Schemer(sed=sad)
         # NEW: EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy
-        assert schemer.said == Schema.ECR_AUTH_SCHEMA
+        assert schemer.said == Schema.ECR_AUTH_SCHEMA2
         db.schema.pin(schemer.said, schemer)
         
         sad = {

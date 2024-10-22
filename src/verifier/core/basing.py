@@ -14,14 +14,32 @@ from keri.db import dbing, subing, koming
 from keri.db.subing import CesrIoSetSuber
 from keri.help.helping import nowUTC
 
+import datetime
+
 @dataclass
 class CredProcessState:
     said: str = None
     state: str = None
+    msg: str = None
     date: str = nowUTC().isoformat()
     
     def __iter__(self):
         return iter(asdict(self))
+
+CRYPT_INVALID = "Credential cryptographically invalid"
+CRYPT_VALID = "Credential cryptographically valid"
+CRED_AGE_OFF = "Credential presentation has aged off"
+
+    
+def cred_age_off(state: CredProcessState, timeout: float):
+    # cancel presentations that have been around longer than timeout
+    now = nowUTC()
+    age = now - datetime.datetime.fromisoformat(state.date)
+    state = None
+    if state.state != CRED_AGE_OFF and age > datetime.timedelta(seconds=timeout):
+        state = CredProcessState(said=state.said, state=CRED_AGE_OFF)
+        return True, state
+    return False, state
 
 # @dataclass
 # class CredProcessStates:

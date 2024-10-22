@@ -290,12 +290,12 @@ def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str)
 
     return cred
     
-def get_ecr_auth_edge(lei_dig, lei_schema):
+def get_ecr_auth_edge(le_dig, le_schema):
     sad = dict(
         d="",
         le = dict(
-            n=f"{lei_dig}",
-            s=f"{lei_schema}",
+            n=f"{le_dig}",
+            s=f"{le_schema}",
         )
     )
     _, edge = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
