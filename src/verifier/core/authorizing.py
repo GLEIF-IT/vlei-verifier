@@ -6,6 +6,7 @@ verfier.core.handling module
 EXN Message handling
 """
 import datetime
+from typing import List
 from hio.base import doing
 
 from keri import kering
@@ -28,11 +29,28 @@ AUTH_REVOKED = "Credential revoked"
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
 class Schema:
     DES_ALIASES_SCHEMA = "EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
-    ECR_AUTH_SCHEMA = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
+    ECR_AUTH_SCHEMA1 = "EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g"
+    ECR_AUTH_SCHEMA2 = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
     ECR_SCHEMA = "EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP"
     ECR_SCHEMA_PROD = "EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw"
-    LEI_SCHEMA = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
-    QVI_SCHEMA = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
+    LE_SCHEMA1 = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
+    LE_SCHEMA2 = "ENPXp1vQzRF6JwIuS-mp2U8Uf1MoADoP_GqQ62VsDZWY"
+    OOR_AUTH_SCHEMA = "EKA57bKBKxr_kN7iN5i7lMUxpMG-s19dRcmov1iDxz-E"
+    OOR_SCHEMA = "EBNaNu-M9P5cgrnfl2Fvymy4E_jvxxyjb70PRtiANlJy"
+    QVI_SCHEMA1 = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
+    QVI_SCHEMA2 = "EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
+    
+    schema_names = {}
+    schema_names[ECR_AUTH_SCHEMA1] = "ECR_AUTH"
+    schema_names[ECR_AUTH_SCHEMA2] = "ECR_AUTH"
+    schema_names[ECR_SCHEMA] = "ECR"
+    schema_names[ECR_SCHEMA_PROD] = "ECR"
+    schema_names[LE_SCHEMA1] = "LE"
+    schema_names[LE_SCHEMA2] = "LE"
+    schema_names[OOR_AUTH_SCHEMA] = "OOR_AUTH"
+    schema_names[OOR_SCHEMA] = "OOR"
+    schema_names[QVI_SCHEMA1] = "QVI"
+    schema_names[QVI_SCHEMA2] = "QVI"
 
 
 def setup(hby, vdb, reger, cf):
@@ -111,8 +129,10 @@ class Authorizer:
             now = helping.nowUTC()
             age = now - datetime.datetime.fromisoformat(state.date)
             cred_state = None
-            if state.state != AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth):
-                cred_state = CredProcessState(said=state.said, state=AUTH_EXPIRE)
+            if state.state == AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth*2):
+                self.vdb.iss.rem(keys=(aid,))
+            elif state.state != AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth):
+                cred_state = CredProcessState(said=state.said, state=AUTH_EXPIRE, msg=f"Cred state exceeded {self.TimeoutAuth}")
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 print(
                     f"{state.said} for {aid}, has expired: {age} greater than {self.TimeoutAuth}"
@@ -126,17 +146,17 @@ class Authorizer:
                 cred_state = CredProcessState(said=state.said, state=AUTH_PENDING)
                 creder = self.reger.creds.get(keys=(state.said,))
                 # are there multiple creds for the same said?
-                res = self.processCredFilters(creder)
+                res = self.cred_filters(creder)
                 if(res[0]):
                     cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS)
                 else:
-                    cred_state = CredProcessState(said=state.said, state=AUTH_FAIL)
+                    cred_state = CredProcessState(said=state.said, state=AUTH_FAIL, msg=f"{res[1]}")
             else:
                 # No need to process state.state == CRYPT_INVALID or state.state == AUTH_EXPIRE or state.state == AUTH_FAIL or state.state == AUTH_REVOKED or state.state == AUTH_SUCCESS:
                 continue
             self.vdb.iss.pin(keys=(aid,), val=cred_state)
 
-    def processCredFilters(self, creder) -> (bool,str):
+    def cred_filters(self, creder) -> tuple[bool,str]:
         """Process a fully verified engagement context role vLEI credential presentation
 
         1.  If the LEI filter is configured, ensure the LEI is in the list of acceptable LEIs
@@ -153,7 +173,10 @@ class Authorizer:
                 # passed schema check
                 res = True, f"passed schema check"
             case _:
-                res = False, f"unknown schema {creder.schema}"                        
+                if Schema.schema_names.get(creder.schema):
+                    res = False, f"Can't authorize cred with {Schema.schema_names[creder.schema]} schema"
+                else:
+                    res = False, f"Can't authorize cred with unknown schema {creder.schema}"                        
 
         if res[0]:
             if creder.issuer not in self.hby.kevers:
@@ -165,12 +188,76 @@ class Authorizer:
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
             elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
                 res = False, f"{creder.attrib["engagementContextRole"]} in not a valid submitter role"
+            elif not (chain := self.chain_complete(creder))[0]:
+                res = chain
             else:            
                 acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
                 res = True, f"Successful authentication, storing user {creder.attrib["i"]} with LEI {creder.attrib["LEI"]}"
                 self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
         print(f"Cred filter status {res[0]}, {res[1]}")
         return res
+
+    def chain_complete(self, creder) -> tuple[bool,str]:
+        cred_type = "NON_VLEI"
+        chain_success = False
+        chain_msg = f"Unknown credential schema type {creder.schema} not supported"
+        
+        cred_type = Schema.schema_names.get(creder.schema)
+        match creder.schema:
+            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
+                if creder.edge.get("auth"):
+                    chain_success, chain_msg = self.expect_edge(cred_type, creder.edge["auth"], [Schema.ECR_AUTH_SCHEMA1,Schema.ECR_AUTH_SCHEMA2])
+                elif creder.edge.get("le"):
+                    chain_success, chain_msg = self.expect_edge(cred_type, creder.edge["le"], [Schema.LE_SCHEMA1, Schema.LE_SCHEMA2])
+                else:
+                    chain_success, chain_msg = (False,f"Unexpected {cred_type} cred edge {creder.edge}")
+            case Schema.ECR_AUTH_SCHEMA1 | Schema.ECR_AUTH_SCHEMA2:
+                if creder.edge.get("le"):
+                    chain_success, chain_msg = self.expect_edge(cred_type, creder.edge["le"], [Schema.LE_SCHEMA1, Schema.LE_SCHEMA2])
+                else:
+                    chain_success, chain_msg = (False,f"Unexpected {cred_type} cred edge {creder.edge}")
+            case Schema.LE_SCHEMA1 | Schema.LE_SCHEMA2:
+                if creder.edge.get("qvi"):
+                    chain_success, chain_msg = self.expect_edge(cred_type, creder.edge["qvi"], [Schema.QVI_SCHEMA1, Schema.QVI_SCHEMA2])
+                else:
+                    chain_success, chain_msg = (False,f"Unexpected {cred_type} cred edge {creder.edge}")
+            case Schema.QVI_SCHEMA1 | Schema.QVI_SCHEMA2:
+                if creder.edge:
+                    chain_success, chain_msg = (False,f"Unexpected {cred_type} cred edge {creder.edge}")
+                else:
+                    chain_success, chain_msg = (True, "QVI")
+            # case Schema.GLEIF_EXTERNAL_SCHEMA:
+            #     cred_type = "GLEIF_EXTERNAL"
+            #     chain_success, chain_msg = self.expect_edge(cred_type, creder.edge, [Schema.GLEIF_INTERNAL_SCHEMA])
+            # case Schema.GLEIF_INTERNAL_SCHEMA:
+            #     cred_type = "GLEIF_INTERNAL"
+            case _:
+                print(f"{chain_msg}")
+            
+        return chain_success, chain_msg
+    
+    def expect_edge(self, cred_type: str, edge, chained_schemas: List[str]):
+        chain_msg = "Expected edge "
+        chain_success = False
+        chain = None
+        if not edge:
+            chain_msg = f"{cred_type} cred should have an edge"
+            chain_success = False
+        elif edge["s"] in chained_schemas:
+            chain = self.chain_complete(self.reger.creds.get(keys=(edge["n"],)))
+            chain_success = chain[0]
+            if not chain_success:
+                chain_msg = chain[1]
+            else:
+                chain_msg = chain[1] + f"->{cred_type}"
+        else:
+            chain_success = False
+            chain_msg = f"{cred_type} should chain to schema {chained_schemas}, not {edge["s"]}"
+        
+        if not chain_success:
+            chain_msg = f"{cred_type} chain validation failed, " + chain_msg
+            
+        return chain_success, chain_msg
 
     def processRevocations(self):
         """Loop over database of credential revocations.
@@ -234,7 +321,6 @@ class AuthorizationDoer(doing.Doer):
     def recur(self, tyme):
         """Process all escrows once per recurrence."""
         self.authn.processEscrows()
-
         return False
 
 

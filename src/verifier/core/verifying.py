@@ -197,7 +197,7 @@ class PresentationResourceEndpoint:
             rep.status = falcon.HTTP_NO_CONTENT
             rep.data = json.dumps(
                 dict(
-                    msg=f"Cred {said} is not found: {cred_state.state}",
+                    msg=f"Cred {said} is not found: {state.state}, msg: {state.msg}",
                 )
             ).encode("utf-8")
             return
@@ -205,7 +205,7 @@ class PresentationResourceEndpoint:
             rep.status = falcon.HTTP_RESET_CONTENT
             rep.data = json.dumps(
                 dict(
-                    msg=f"Cred {said} has aged_off: {state.state}",
+                    msg=f"Cred {said} has aged_off: {state.state}, msg: {state.msg}",
                 )
             ).encode("utf-8")
             return
@@ -281,7 +281,7 @@ class AuthorizationResourceEnd:
             else:
                 rep.data = json.dumps(
                     dict(
-                        msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}"
+                        msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, msg: {state.msg}"
                     )
                 ).encode("utf-8")
         else:

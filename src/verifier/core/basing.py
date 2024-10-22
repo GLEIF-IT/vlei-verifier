@@ -20,6 +20,7 @@ import datetime
 class CredProcessState:
     said: str = None
     state: str = None
+    msg: str = None
     date: str = nowUTC().isoformat()
     
     def __iter__(self):

@@ -13,7 +13,6 @@ from verifier.core import basing, verifying
 from verifier.core.authorizing import Authorizer, Schema
 
 def test_ecr(seeder):
-    app = falcon.App()
 
     with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
@@ -26,42 +25,42 @@ def test_ecr(seeder):
         qvicred = get_qvi_cred(
             issuer=hab.pre,
             recipient=hab.pre,
-            schema=Schema.QVI_SCHEMA,
+            schema=Schema.QVI_SCHEMA1,
             registry=registry,
             lei=LEI1,
         )
         hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(
-            hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA, qvicred, seqner
+            hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA1, qvicred, seqner
         )
 
-        qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA)
+        qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA1)
 
         leicred = get_lei_cred(
             issuer=hab.pre,
             recipient=hab.pre,
-            schema=Schema.LEI_SCHEMA,
+            schema=Schema.LE_SCHEMA1,
             registry=registry,
             sedge=qviedge,
             lei=LEI1,
         )
         hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(
-            hby, hab, regery, registry, verifier, Schema.LEI_SCHEMA, leicred, seqner
+            hby, hab, regery, registry, verifier, Schema.LE_SCHEMA1, leicred, seqner
         )
 
         # chained ecr auth cred
-        eaedge = get_ecr_auth_edge(lsaid, Schema.LEI_SCHEMA)
+        eaedge = get_ecr_auth_edge(lsaid, Schema.LE_SCHEMA1)
 
         eacred = get_ecr_auth_cred(
             aid=hab.pre,
             issuer=hab.pre,
             recipient=hab.pre,
-            schema=Schema.ECR_AUTH_SCHEMA,
+            schema=Schema.ECR_AUTH_SCHEMA2,
             registry=registry,
             sedge=eaedge,
             lei=LEI1,
         )
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
-            hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA, eacred, seqner
+            hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner
         )
 
         # try submitting the ECR auth cred
@@ -70,12 +69,12 @@ def test_ecr(seeder):
         acdc = issAndCred.decode("utf-8")
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
-        success, msg = auth.processCredFilters(eacred)
+        success, msg = auth.cred_filters(eacred)
         assert not success
-        assert msg == f'unknown schema {eacred.schema}'
+        assert msg == f"Can't authorize cred with ECR_AUTH schema"
 
         # chained ecr auth cred
-        ecredge = get_ecr_edge(easaid, Schema.ECR_AUTH_SCHEMA)
+        ecredge = get_ecr_edge(easaid, Schema.ECR_AUTH_SCHEMA2)
 
         ecr = get_ecr_cred(
             issuer=hab.pre,
@@ -93,7 +92,7 @@ def test_ecr(seeder):
         issAndCred.extend(ecmsgs)
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
-        success, msg = auth.processCredFilters(ecr)
+        success, msg = auth.cred_filters(ecr)
         assert success
         assert msg == 'Successful authentication, storing user EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9o with LEI 254900OPPU84GM83MG36'
 
