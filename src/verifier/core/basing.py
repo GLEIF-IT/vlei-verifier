@@ -6,25 +6,25 @@ verifier.core.basing module
 Database support
 """
 from collections import namedtuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import List
 
 from keri.core import coring
 from keri.db import dbing, subing, koming
 from keri.db.subing import CesrIoSetSuber
 from keri.help.helping import nowUTC
-
+from typing import Optional
 import datetime
 
 @dataclass
 class CredProcessState:
-    said: str = None
-    state: str = None
-    msg: str = None
-    date: str = nowUTC().isoformat()
+    said: Optional[str] = None
+    state: Optional[str] = None
+    msg: Optional[str] = None
+    date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
     
     def __iter__(self):
-        return iter(asdict(self))
+        return iter(asdict(self).values())
 
 CRYPT_INVALID = "Credential cryptographically invalid"
 CRYPT_VALID = "Credential cryptographically valid"

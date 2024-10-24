@@ -14,7 +14,7 @@ import verifier.core.authorizing as authorizing
 import verifier.core.reporting as reporting
 
 host = "localhost"
-port = 7666
+port = 7676
 url = f"http://{host}:{port}"
 
 def test_service_ecr(seeder):        
@@ -52,6 +52,7 @@ def test_service_ecr(seeder):
         server = http.Server(port=port, app=app)
         httpServerDoer = http.ServerDoer(server=server)
         class testCf:
+            @staticmethod
             def get():
                 return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
         authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=testCf)
@@ -112,30 +113,30 @@ def test_service_ecr(seeder):
         if exceptions:
             raise exceptions[0]
         
-# @pytest.mark.manual
+@pytest.mark.manual
 # def test_service_integration(seeder):
 #     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
 #
 #         seeder.seedSchema(db=hby.db)
 #         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
-#         qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA1, registry=registry)
+#         qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA1, registry=registry, lei="875500ELOZEL05BVXV37")
 #         hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA1, qvicred, seqner)
 #
 #         qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA1)
 #
-#         leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.LE_SCHEMA1, registry=registry, sedge=qviedge)
+#         leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.LE_SCHEMA1, registry=registry, sedge=qviedge, lei="875500ELOZEL05BVXV37")
 #         hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.LE_SCHEMA1, leicred, seqner)
 #
 #         #chained ecr auth cred
 #         eaedge = get_ecr_auth_edge(lsaid,Schema.LE_SCHEMA1)
 #
-#         eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA2, registry=registry, sedge=eaedge)
+#         eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA2, registry=registry, sedge=eaedge, lei="875500ELOZEL05BVXV37")
 #         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner)
 #
 #         #chained ecr auth cred
 #         ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA2)
 #
-#         ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge)
+#         ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge, lei="875500ELOZEL05BVXV37")
 #         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
 #
 #         app = falcon.App(
