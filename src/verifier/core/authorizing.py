@@ -151,10 +151,10 @@ class Authorizer:
                     cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS)
                 else:
                     cred_state = CredProcessState(said=state.said, state=AUTH_FAIL, msg=f"{res[1]}")
+                self.vdb.iss.pin(keys=(aid,), val=cred_state)
             else:
                 # No need to process state.state == CRYPT_INVALID or state.state == AUTH_EXPIRE or state.state == AUTH_FAIL or state.state == AUTH_REVOKED or state.state == AUTH_SUCCESS:
                 continue
-            self.vdb.iss.pin(keys=(aid,), val=cred_state)
 
     def cred_filters(self, creder) -> tuple[bool,str]:
         """Process a fully verified engagement context role vLEI credential presentation
@@ -187,7 +187,7 @@ class Authorizer:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
             elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
-                res = False, f"{creder.attrib["engagementContextRole"]} in not a valid submitter role"
+                res = False, f"{creder.attrib["engagementContextRole"]} is not a valid submitter role"
             elif not (chain := self.chain_complete(creder))[0]:
                 res = chain
             else:            
