@@ -4,7 +4,13 @@ import json
 
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
-from verifier.core.basing import CRYPT_INVALID, CRYPT_VALID, CredProcessState, cred_age_off
+from verifier.core.basing import (
+    CRED_CRYPT_INVALID,
+    CRED_CRYPT_VALID,
+    CredProcessState,
+    cred_age_off,
+)
+
 
 def setup(app, hby, vdb, reger, local=False):
     """Set up verifying endpoints to process vLEI credential verifications
@@ -115,7 +121,9 @@ class PresentationResourceEndpoint:
         if len(self.vry.cues) > 0:
             rep.status = falcon.HTTP_SERVICE_UNAVAILABLE
             rep.data = json.dumps(
-                dict(msg=f"Verifier is busy processing another VC presentation")
+                dict(
+                    msg=f"Verifier is busy processing another VC presentation, try credential {said} presentation again later"
+                )
             ).encode("utf-8")
 
         parsing.Parser().parse(ims=ims, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
@@ -132,8 +140,11 @@ class PresentationResourceEndpoint:
         self.vry.cues.clear()
 
         if not found:
-            # TODO provide endpoint to check status of credential by said, to see crypt_invalid?
-            cred_state = CredProcessState(said=said, state=CRYPT_INVALID)
+            info = f"Presented credential {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
+            print(info)
+            cred_state = CredProcessState(
+                said=said, state=CRED_CRYPT_INVALID, info=info
+            )
             self.vdb.iss.pin(keys=(said,), val=cred_state)
             rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(
@@ -170,8 +181,9 @@ class PresentationResourceEndpoint:
         # clear any previous login, now that a valid credential has been presented
         self.vdb.accts.rem(keys=(aid,))
 
-        print(f"Credential {said} presented for {aid} is cryptographically valid.")
-        cred_state = CredProcessState(said=said, state=CRYPT_VALID)
+        info = f"Credential {said} presented for {aid} is cryptographically valid"
+        print(info)
+        cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
         self.vdb.iss.pin(keys=(aid,), val=cred_state)
         self.vdb.iss.pin(keys=(said,), val=cred_state)
         rep.status = falcon.HTTP_ACCEPTED
@@ -192,20 +204,20 @@ class PresentationResourceEndpoint:
         """
 
         state: CredProcessState = self.vdb.iss.get(keys=(said,))
-        aged_off, state = cred_age_off(state, 600.0)
+        is_aged_off, state = cred_age_off(state, 600.0)
         if state is None:
             rep.status = falcon.HTTP_NO_CONTENT
             rep.data = json.dumps(
                 dict(
-                    msg=f"Cred {said} is not found: {state.state}, msg: {state.msg}",
+                    msg=f"Cred {said} is not found: state is '{state.state}', info='{state.info}'",
                 )
             ).encode("utf-8")
             return
-        elif aged_off:
+        elif is_aged_off:
             rep.status = falcon.HTTP_RESET_CONTENT
             rep.data = json.dumps(
                 dict(
-                    msg=f"Cred {said} has aged_off: {state.state}, msg: {state.msg}",
+                    msg=f"Cred {said} has aged_off: state is '{state.state}', info='{state.info}'",
                 )
             ).encode("utf-8")
             return
@@ -213,10 +225,11 @@ class PresentationResourceEndpoint:
             rep.status = falcon.HTTP_ACCEPTED
             rep.data = json.dumps(
                 dict(
-                    msg=f"Cred {said} state is: {state.state}",
+                    msg=f"Cred {said} state is '{state.state}', info='{state.info}'",
                 )
             ).encode("utf-8")
             return
+
 
 class AuthorizationResourceEnd:
     """Authroization resource endpoint
@@ -281,7 +294,7 @@ class AuthorizationResourceEnd:
             else:
                 rep.data = json.dumps(
                     dict(
-                        msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, msg: {state.msg}"
+                        msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, info: {state.info}"
                     )
                 ).encode("utf-8")
         else:
@@ -289,7 +302,7 @@ class AuthorizationResourceEnd:
                 aid=aid,
                 said=acct.said,
                 lei=acct.lei,
-                msg=f"AID {aid} w/ lei {acct.lei} presented valid credential",
+                msg=f"AID {aid} w/ lei {acct.lei} has valid login account",
             )
 
             rep.status = falcon.HTTP_OK
@@ -389,7 +402,7 @@ class RequestVerifierResourceEnd:
             rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(
                 dict(
-                    msg=f"{aid} provided invalid Cigar signature on encoded request data"
+                    msg=f"{aid} provided invalid Cigar signature on encoded request data: {ex}"
                 )
             ).encode("utf-8")
             return

@@ -197,7 +197,7 @@ def test_ecr(seeder):
         assert result.json['aid'] == hab.pre
         assert result.json['said'] == ecsaid
         assert result.json['lei'] == LEI1
-        assert result.json['msg'] == f"AID {hab.pre} w/ lei {LEI1} presented valid credential"
+        assert result.json['msg'] == f"AID {hab.pre} w/ lei {LEI1} has valid login account"
 
         data = "this is the raw data"
         raw = data.encode("utf-8")
