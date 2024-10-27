@@ -20,14 +20,14 @@ import datetime
 class CredProcessState:
     said: Optional[str] = None
     state: Optional[str] = None
-    msg: Optional[str] = None
+    info: Optional[str] = None
     date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
     
     def __iter__(self):
         return iter(asdict(self).values())
 
-CRYPT_INVALID = "Credential cryptographically invalid"
-CRYPT_VALID = "Credential cryptographically valid"
+CRED_CRYPT_INVALID = "Credential cryptographically invalid"
+CRED_CRYPT_VALID = "Credential cryptographically valid"
 CRED_AGE_OFF = "Credential presentation has aged off"
 
     
@@ -37,7 +37,7 @@ def cred_age_off(state: CredProcessState, timeout: float):
     age = now - datetime.datetime.fromisoformat(state.date)
     state = None
     if state.state != CRED_AGE_OFF and age > datetime.timedelta(seconds=timeout):
-        state = CredProcessState(said=state.said, state=CRED_AGE_OFF)
+        state = CredProcessState(said=state.said, state=CRED_AGE_OFF, info=f"Credential was {age} which exceeds timeout threshold {timeout}")
         return True, state
     return False, state
 

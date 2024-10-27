@@ -50,7 +50,7 @@ def test_ecr(seeder):
         # chained ecr auth cred
         eaedge = get_ecr_auth_edge(lsaid, Schema.LE_SCHEMA1)
 
-        eacred = get_ecr_auth_cred(
+        ecr_auth_cred = get_ecr_auth_cred(
             aid=hab.pre,
             issuer=hab.pre,
             recipient=hab.pre,
@@ -60,7 +60,7 @@ def test_ecr(seeder):
             lei=LEI1,
         )
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
-            hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner
+            hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, ecr_auth_cred, seqner
         )
 
         # try submitting the ECR auth cred
@@ -69,14 +69,17 @@ def test_ecr(seeder):
         acdc = issAndCred.decode("utf-8")
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
-        success, msg = auth.cred_filters(eacred)
+        chain_success, chain_msg = auth.chain_filters(ecr_auth_cred)
+        assert chain_success
+        assert chain_msg == f"QVI->LE->ECR_AUTH"
+        success, msg = auth.cred_filters(ecr_auth_cred)
         assert not success
         assert msg == f"Can't authorize cred with ECR_AUTH schema"
 
         # chained ecr auth cred
         ecredge = get_ecr_edge(easaid, Schema.ECR_AUTH_SCHEMA2)
 
-        ecr = get_ecr_cred(
+        ecr_cred = get_ecr_cred(
             issuer=hab.pre,
             recipient=hab.pre,
             schema=Schema.ECR_SCHEMA,
@@ -85,16 +88,19 @@ def test_ecr(seeder):
             lei=LEI1,
         )
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
-            hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner
+            hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr_cred, seqner
         )
 
         issAndCred = bytearray()
         issAndCred.extend(ecmsgs)
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
-        success, msg = auth.cred_filters(ecr)
-        assert success
-        assert msg == 'Successful authentication, storing user EKC8085pwSwzLwUGzh-HrEoFDwZnCJq27bVp5atdMT9o with LEI 254900OPPU84GM83MG36'
+        chain_success, chain_msg = auth.chain_filters(ecr_cred)
+        assert chain_success
+        assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"
+        passed_filters, msg = auth.cred_filters(ecr_cred)
+        assert passed_filters
+        assert msg == f"Credential passed filters for user {hab.pre} with LEI {LEI1}"
 
         data = '"@method": GET\n"@path": /verify/header\n"signify-resource": EHYfRWfM6RxYbzyodJ6SwYytlmCCW2gw5V-FsoX5BgGx\n"signify-timestamp": 2024-05-01T19:54:53.571000+00:00\n"@signature-params: (@method @path signify-resource signify-timestamp);created=1714593293;keyid=BOieebDzg4uaqZ2zuRAX1sTiCrD3pgGT3HtxqSEAo05b;alg=ed25519"'
         raw = data.encode("utf-8")
