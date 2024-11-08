@@ -1,5 +1,9 @@
 from keri import kering
 from keri.core import MtrDex, coring
+from keri.vdr.eventing import state
+
+from verifier.core.basing import AUTH_REVOKED, CredProcessState
+
 
 class DigerBuilder:
     @staticmethod
@@ -24,3 +28,13 @@ class DigerBuilder:
     def build_diger(raw, code):
         diger = coring.Diger(raw=raw, code=code)
         return diger
+
+
+def process_revocations(vdb, creds, said):
+    for cred in creds:
+        if cred.get("sad", {}).get("d") == said:
+            if cred.get("status", {}).get("et") == 'rev':
+                aid = cred.get("sad").get("a").get("i")
+                rev_state = CredProcessState(said=said, info="Credential was revoked", state=AUTH_REVOKED)
+                vdb.iss.pin(keys=(aid,), val=rev_state)
+                vdb.iss.pin(keys=(said,), val=rev_state)

@@ -8,8 +8,9 @@ from verifier.core.basing import (
     CRED_CRYPT_INVALID,
     CRED_CRYPT_VALID,
     CredProcessState,
-    cred_age_off,
+    cred_age_off, AUTH_REVOKED,
 )
+from verifier.core.utils import process_revocations
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -177,22 +178,35 @@ class PresentationResourceEndpoint:
             creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
             type = "issuer"
 
-        print(f"{aid} account cleared after successful presentation")
-        # clear any previous login, now that a valid credential has been presented
-        self.vdb.accts.rem(keys=(aid,))
+        # Here we don't process credentials that have been revoked(We don't update their state)
+        # If the credential was revoked we shouldn't update it's state with the new one
+        if not self.vdb.iss.get(keys=(aid,)) or self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED:
+            print(f"{aid} account cleared after successful presentation")
+            # clear any previous login, now that a valid credential has been presented
+            self.vdb.accts.rem(keys=(aid,))
 
-        info = f"Credential {said} presented for {aid} is cryptographically valid"
-        print(info)
-        cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
-        self.vdb.iss.pin(keys=(aid,), val=cred_state)
-        self.vdb.iss.pin(keys=(said,), val=cred_state)
-        rep.status = falcon.HTTP_ACCEPTED
-        rep.data = json.dumps(
-            dict(
-                creds=json.dumps(creds),
-                msg=f"{said} for {aid} as {type} is {cred_state.state}",
-            )
-        ).encode("utf-8")
+            info = f"Credential {said} presented for {aid} is cryptographically valid"
+            print(info)
+            cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
+            self.vdb.iss.pin(keys=(aid,), val=cred_state)
+            self.vdb.iss.pin(keys=(said,), val=cred_state)
+            # Here we need to check if the credential was revoked and if so we update it's state to AUTH_REVOKED
+            process_revocations(self.vdb, creds, said)
+            rep.status = falcon.HTTP_ACCEPTED
+            rep.data = json.dumps(
+                dict(
+                    creds=json.dumps(creds),
+                    msg=f"{said} for {aid} as {type} is {cred_state.state}",
+                )
+            ).encode("utf-8")
+        else:
+            rep.status = falcon.HTTP_ACCEPTED
+            rep.data = json.dumps(
+                dict(
+                    creds=json.dumps(creds),
+                    msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
+                )
+            ).encode("utf-8")
         return
 
     def on_get(self, req, rep, said):

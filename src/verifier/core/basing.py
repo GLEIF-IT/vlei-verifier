@@ -29,8 +29,8 @@ class CredProcessState:
 CRED_CRYPT_INVALID = "Credential cryptographically invalid"
 CRED_CRYPT_VALID = "Credential cryptographically valid"
 CRED_AGE_OFF = "Credential presentation has aged off"
+AUTH_REVOKED = "Credential presentation has aged off"
 
-    
 def cred_age_off(state: CredProcessState, timeout: float):
     # cancel presentations that have been around longer than timeout
     now = nowUTC()

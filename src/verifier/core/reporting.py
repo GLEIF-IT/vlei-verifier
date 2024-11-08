@@ -94,7 +94,7 @@ class Filer:
             stream (File): file like stream object to load the report data from
 
         """
-        self.vdb.delTopVal(db=self.vdb.imgs, top=dig.encode("utf-8"))
+        self.vdb.delTopVal(db=self.vdb.imgs, key=dig.encode("utf-8"))
         stats = ReportStats(
             submitter=aid,
             filename=filename,
