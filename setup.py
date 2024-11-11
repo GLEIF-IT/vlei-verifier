@@ -74,7 +74,7 @@ setup(
     ],
     python_requires='>=3.12.2',
     install_requires=[
-        'keri>=1.2.0-rc3',
+        'keri==1.2.0-dev12',
         'mnemonic>=0.20',
         'multicommand>=1.0.0',
         'falcon>=3.1.0',

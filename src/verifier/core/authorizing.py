@@ -13,7 +13,7 @@ from keri import kering
 from keri.core import coring
 from keri.help import helping
 
-from verifier.core.basing import Account, CredProcessState
+from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
 from verifier.core.verifying import CRED_CRYPT_VALID
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
@@ -23,7 +23,6 @@ AUTH_PENDING = "Credential pending authorization"
 AUTH_SUCCESS = "Credential authorized"
 AUTH_FAIL = "Credential unauthorized"
 AUTH_EXPIRE = "Credential authorization expired"
-AUTH_REVOKED = "Credential revoked"
 
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
@@ -131,7 +130,9 @@ class Authorizer:
             cred_state = None
             if state.state == AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth*2):
                 self.vdb.iss.rem(keys=(aid,))
-            elif state.state != AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth):
+            # We keep revoked credentials in the DB because their auth should never expire and the state
+            # must always be AUTH_REVOKED to avoid logging in again with the older version of the credential
+            elif state.state != AUTH_REVOKED and state.state != AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth):
                 cred_state = CredProcessState(said=state.said, state=AUTH_EXPIRE, info=f"Cred state exceeded {self.TimeoutAuth}")
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 print(
@@ -304,20 +305,20 @@ class Authorizer:
 
             creder = self.reger.ccrd.get(keys=(said,))
             if (
-                creder is None
+                    creder is None
             ):  # received revocation before credential.  probably an error but let it timeout
                 continue
 
             regk = creder.status
             state = self.reger.tevers[regk].vcState(creder.said)
             if (
-                state is None
+                    state is None
             ):  # received revocation before status.  probably an error but let it timeout
                 continue
 
             elif state.ked["et"] in (
-                coring.Ilks.iss,
-                coring.Ilks.bis,
+                    coring.Ilks.iss,
+                    coring.Ilks.bis,
             ):  # haven't received revocation event yet
                 continue
 
