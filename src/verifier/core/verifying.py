@@ -180,7 +180,7 @@ class PresentationResourceEndpoint:
 
         # Here we don't process credentials that have been revoked(We don't update their state)
         # If the credential was revoked we shouldn't update it's state with the new one
-        if not self.vdb.iss.get(keys=(aid,)) or self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED:
+        if not self.vdb.iss.get(keys=(aid,)) or (self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED or self.vdb.iss.get(keys=(aid,)).said != said):
             print(f"{aid} account cleared after successful presentation")
             # clear any previous login, now that a valid credential has been presented
             self.vdb.accts.rem(keys=(aid,))
