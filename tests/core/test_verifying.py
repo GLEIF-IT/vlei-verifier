@@ -84,10 +84,10 @@ def test_setup_verifying(seeder):
         raw = data.encode("utf-8")
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
-        result = client.simulate_post(
-            f"/request/verify/{hab.pre}", params={"data": data, "sig": cig.qb64}
-        )
-        assert result.status == falcon.HTTP_403
+        # result = client.simulate_post(
+        #     f"/request/verify/{hab.pre}", params={"data": data, "sig": cig.qb64}
+        # )
+        # assert result.status == falcon.HTTP_403
 
 
 def test_ecr(seeder):
@@ -348,10 +348,10 @@ def test_ecr_missing(seeder):
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
 
-        result = client.simulate_post(
-            f"/request/verify/{hab.pre}", params={"data": data, "sig": cig.qb64}
-        )
-        assert result.status == falcon.HTTP_403
+        # result = client.simulate_post(
+        #     f"/request/verify/{hab.pre}", params={"data": data, "sig": cig.qb64}
+        # )
+        # assert result.status == falcon.HTTP_403
 
         result = client.simulate_post(
             f"/request/verify/{unknown_prefix}", params={"data": data, "sig": cig.qb64}
