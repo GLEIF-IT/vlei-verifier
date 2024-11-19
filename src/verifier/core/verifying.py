@@ -400,13 +400,14 @@ class RequestVerifierResourceEnd:
             ).encode("utf-8")
             return
 
-        acct = self.vdb.accts.get(keys=(aid,))
-        if acct is None:
-            rep.status = falcon.HTTP_FORBIDDEN
-            rep.data = json.dumps(
-                dict(msg=f"identifier {aid} has no valid credential for access")
-            ).encode("utf-8")
-            return
+        # Removed this check in order to process revocations with signed headers correctly
+        # acct = self.vdb.accts.get(keys=(aid,))
+        # if acct is None:
+        #     rep.status = falcon.HTTP_FORBIDDEN
+        #     rep.data = json.dumps(
+        #         dict(msg=f"identifier {aid} has no valid credential for access")
+        #     ).encode("utf-8")
+        #     return
 
         kever = self.hby.kevers[aid]
         verfers = kever.verfers
