@@ -48,4 +48,12 @@ git commit -s -S -m"Added docs folder and CONTRIBUTE guide"
 * Set the reviewer to 2byrds (or whoever you want to review your changes)
 * Add a title and description
 * Set yourself as the assignee
+* Click "Create draft pull request" until it is ready for final review
+* Click "Ready for review" when you are ready for the reviewer to look at the changes to be merged
 ![alt text](image-7.png)
+![alt text](image-8.png)
+
+# Respond to the reviewers questions/comments/requests
+* Note there are several automated checks that must all pass
+
+# Once approved the merge request will be merged
