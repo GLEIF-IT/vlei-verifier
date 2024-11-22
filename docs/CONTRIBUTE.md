@@ -63,4 +63,4 @@ git commit -s -S -m"Added docs folder and CONTRIBUTE guide"
 * Note there are several automated checks listed on the PR overview that must all pass
 
 # Merge and Issue update
-* Once approved the pull request will be merged and the issue can be update/close
+* Once approved the pull request will be merged and the issue can be updated/close
