@@ -113,79 +113,79 @@ def test_service_ecr(seeder):
         if exceptions:
             raise exceptions[0]
         
-# @pytest.mark.manual
-# def test_service_integration(seeder):
-#     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
-#
-#         seeder.seedSchema(db=hby.db)
-#         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
-#         qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA1, registry=registry, lei="875500ELOZEL05BVXV37")
-#         hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA1, qvicred, seqner)
-#
-#         qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA1)
-#
-#         leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.LE_SCHEMA1, registry=registry, sedge=qviedge, lei="875500ELOZEL05BVXV37")
-#         hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.LE_SCHEMA1, leicred, seqner)
-#
-#         #chained ecr auth cred
-#         eaedge = get_ecr_auth_edge(lsaid,Schema.LE_SCHEMA1)
-#
-#         eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA2, registry=registry, sedge=eaedge, lei="875500ELOZEL05BVXV37")
-#         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner)
-#
-#         #chained ecr auth cred
-#         ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA2)
-#
-#         ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge, lei="875500ELOZEL05BVXV37")
-#         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
-#
-#         app = falcon.App(
-#             middleware=falcon.CORSMiddleware(
-#                 allow_origins='*',
-#                 allow_credentials='*',
-#                 expose_headers=['cesr-attachment', 'cesr-date', 'content-type']))
-#         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-#         verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
-#         server = http.Server(port=port, app=app)
-#         httpServerDoer = http.ServerDoer(server=server)
-#         # class testCf:
-#         #     def get():
-#         #         return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
-#         rootsCf = configing.Configer(name="verifier-config-public.json",
-#                             headDirPath="/home/aidar/Desktop/git/gleif/vlei-verifier/scripts",
-#                             base="",
-#                             temp=False, reopen=True, clear=False)
-#         authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=rootsCf)
-#
-#         reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
-#
-#         doers = authDoers + reportDoers + [httpServerDoer]
-#         limit = 0.25
-#         tock = 0.03125
-#         doist = doing.Doist(limit=limit, tock=tock)
-#         doist.doers = doers
-#         doist.enter()
-#         # assert len(doist.deeds) == 2
-#         # assert [val[1] for val in doist.deeds] == [0.0, 0.0]  #  retymes
-#         # for doer in doers:
-#         #     assert doer.baser.opened
-#         #     assert "_test/keri/db/test" in doer.baser.path
-#         try:
-#             doist.recur()
-#         except Exception as e:
-#             raise ValueError(f"Likely you have another service running on {port}")
-#
-#         issAndCred = bytearray()
-#         # issAndCred.extend(kmsgs)
-#         # issAndCred.extend(tmsgs)
-#         # issAndCred.extend(imsgs)
-#         issAndCred.extend(ecmsgs)
-#         acdc = issAndCred.decode("utf-8")
-#
-#         # use this for integration testing debugging sessions
-#         while True:
-#             time.sleep(1)
-#             doist.recur()
+@pytest.mark.manual
+def test_service_integration(seeder):
+    with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
+
+        seeder.seedSchema(db=hby.db)
+        regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
+        qvicred = get_qvi_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.QVI_SCHEMA1, registry=registry, lei="875500ELOZEL05BVXV37")
+        hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA1, qvicred, seqner)
+
+        qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA1)
+
+        leicred = get_lei_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.LE_SCHEMA1, registry=registry, sedge=qviedge, lei="875500ELOZEL05BVXV37")
+        hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(hby, hab, regery, registry, verifier, Schema.LE_SCHEMA1, leicred, seqner)
+
+        #chained ecr auth cred
+        eaedge = get_ecr_auth_edge(lsaid,Schema.LE_SCHEMA1)
+
+        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA2, registry=registry, sedge=eaedge, lei="875500ELOZEL05BVXV37")
+        hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner)
+
+        #chained ecr auth cred
+        ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA2)
+
+        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge, lei="875500ELOZEL05BVXV37")
+        hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
+        environment_middleware = start.EnvironmentMiddleware()
+        app = falcon.App(
+            middleware=[falcon.CORSMiddleware(
+                allow_origins='*',
+                allow_credentials='*',
+                expose_headers=['cesr-attachment', 'cesr-date', 'content-type']), environment_middleware])
+        vdb = basing.VerifierBaser(name=hby.name, temp=True)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
+        server = http.Server(port=port, app=app)
+        httpServerDoer = http.ServerDoer(server=server)
+        # class testCf:
+        #     def get():
+        #         return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
+        rootsCf = configing.Configer(name="verifier-config-public.json",
+                            headDirPath="/home/aidar/Desktop/git/gleif/vlei-verifier/scripts",
+                            base="",
+                            temp=False, reopen=True, clear=False)
+        authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=rootsCf)
+
+        reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
+
+        doers = authDoers + reportDoers + [httpServerDoer]
+        limit = 0.25
+        tock = 0.03125
+        doist = doing.Doist(limit=limit, tock=tock)
+        doist.doers = doers
+        doist.enter()
+        # assert len(doist.deeds) == 2
+        # assert [val[1] for val in doist.deeds] == [0.0, 0.0]  #  retymes
+        # for doer in doers:
+        #     assert doer.baser.opened
+        #     assert "_test/keri/db/test" in doer.baser.path
+        try:
+            doist.recur()
+        except Exception as e:
+            raise ValueError(f"Likely you have another service running on {port}")
+
+        issAndCred = bytearray()
+        # issAndCred.extend(kmsgs)
+        # issAndCred.extend(tmsgs)
+        # issAndCred.extend(imsgs)
+        issAndCred.extend(ecmsgs)
+        acdc = issAndCred.decode("utf-8")
+
+        # use this for integration testing debugging sessions
+        while True:
+            time.sleep(1)
+            doist.recur()
 
 def presentation_request(said, acdc, exceptions):
     try:
