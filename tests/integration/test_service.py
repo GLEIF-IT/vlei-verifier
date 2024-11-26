@@ -3,7 +3,7 @@ from ..common import *
 import falcon
 from hio.base import doing
 from hio.core import http
-from keri.app import habbing, configing
+from keri.app import habbing, configing, oobiing
 import pytest
 import requests
 import threading
@@ -138,13 +138,16 @@ def test_service_integration(seeder):
 
         ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge, lei="875500ELOZEL05BVXV37")
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
+
+        cors_middleware = falcon.CORSMiddleware(
+            allow_origins='*',
+            allow_credentials='*',
+            expose_headers=['cesr-attachment', 'cesr-date', 'content-type']
+        )
         environment_middleware = start.EnvironmentMiddleware()
         app = falcon.App(
-            middleware=[falcon.CORSMiddleware(
-                allow_origins='*',
-                allow_credentials='*',
-                expose_headers=['cesr-attachment', 'cesr-date', 'content-type']), environment_middleware])
-        vdb = basing.VerifierBaser(name=hby.name, temp=True)
+            middleware=[cors_middleware, environment_middleware])
+        vdb = basing.VerifierBaser(name=hby.name)
         verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
         server = http.Server(port=port, app=app)
         httpServerDoer = http.ServerDoer(server=server)
@@ -158,8 +161,9 @@ def test_service_integration(seeder):
         authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=rootsCf)
 
         reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
-
-        doers = authDoers + reportDoers + [httpServerDoer]
+        hbyDoer = habbing.HaberyDoer(habery=hby)
+        obl = oobiing.Oobiery(hby=hby)
+        doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer]
         limit = 0.25
         tock = 0.03125
         doist = doing.Doist(limit=limit, tock=tock)

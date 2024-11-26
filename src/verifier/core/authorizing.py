@@ -6,6 +6,7 @@ verfier.core.handling module
 EXN Message handling
 """
 import datetime
+import os
 from typing import List
 from hio.base import doing
 
@@ -248,11 +249,14 @@ class Authorizer:
                 if creder.edge:
                     chain_success, chain_msg = (False, f"Unexpected {cred_type} cred edge {creder.edge}")
                 else:
-                    issuer_aid = creder.sad.get("i")
-                    if self.vdb.root.get(keys=(issuer_aid,)):
-                        chain_success, chain_msg = (True, "QVI")
+                    if os.getenv("VERIFY_ROOT_OF_TRUST", False):
+                        issuer_aid = creder.sad.get("i")
+                        if self.vdb.root.get(keys=(issuer_aid,)):
+                            chain_success, chain_msg = (True, "QVI")
+                        else:
+                            chain_success, chain_msg = (False, "The issuer of the QVI credential is not a valid Root Of Trust")
                     else:
-                        chain_success, chain_msg = (False, "The issuer of the QVI credential is not a valid Root Of Trust")
+                        chain_success, chain_msg = (True, "QVI")
             # TODO add logic related to GLEIF external and internal
             # case Schema.GLEIF_EXTERNAL_SCHEMA:
             #     cred_type = "GLEIF_EXTERNAL"

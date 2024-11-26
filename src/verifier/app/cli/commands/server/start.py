@@ -50,9 +50,7 @@ dev_only_endpoints = [r"/root_of_trust/.*"]
 
 class EnvironmentMiddleware:
     def process_request(self, req, resp):
-
         current_env = os.environ.get('VERIFIER_ENV', 'production')
-        print(f"EnvironmentMiddleware: {any(re.match(pattern, req.path) for pattern in dev_only_endpoints)}")
         # Restrict access to specific endpoint in non-production environments
         if any(re.match(pattern, req.path) for pattern in dev_only_endpoints) and current_env == 'production':
             raise falcon.HTTPForbidden(
