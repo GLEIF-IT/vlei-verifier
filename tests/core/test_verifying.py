@@ -1,3 +1,4 @@
+from verifier.core.utils import add_root_of_trust
 from ..common import *
 
 import falcon
@@ -5,8 +6,7 @@ import falcon.testing
 
 from keri.app import habbing
 from keri.core import coring
-from keri.vdr import viring
-
+from keri.vdr import viring, verifying, eventing
 import pytest
 
 from verifier.core import verifying, basing
@@ -357,3 +357,30 @@ def test_ecr_missing(seeder):
             f"/request/verify/{unknown_prefix}", params={"data": data, "sig": cig.qb64}
         )
         assert result.status == falcon.HTTP_404
+
+
+def test_add_root_of_trust(seeder):
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
+        #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+        seeder.seedSchema(db=hby.db)
+
+        app = falcon.App()
+        reger = viring.Reger(name=hby.name, temp=hby.temp)
+        vdb = basing.VerifierBaser(name=hby.name)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=reger)
+        with open("./src/root_of_trust_oobis/test_root_of_trust.json", "rb") as f:
+            json_oobi_gleif = json.loads(f.read())
+            aid = json_oobi_gleif.get("aid")
+            vlei = json_oobi_gleif.get("vlei")
+
+            client = falcon.testing.TestClient(app)
+            result = client.simulate_post(
+                f"/root_of_trust/{aid}",
+                body=vlei,
+                headers={"Content-Type": "application/json+cesr"},
+            )
+            assert result.status == falcon.HTTP_202
+
+
+
+

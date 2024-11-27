@@ -113,7 +113,7 @@ def test_service_ecr(seeder):
         if exceptions:
             raise exceptions[0]
         
-# @pytest.mark.manual
+@pytest.mark.manual
 # def test_service_integration(seeder):
 #     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
 #
@@ -161,9 +161,7 @@ def test_service_ecr(seeder):
 #         authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=rootsCf)
 #
 #         reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
-#         hbyDoer = habbing.HaberyDoer(habery=hby)
-#         obl = oobiing.Oobiery(hby=hby)
-#         doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer]
+#         doers = authDoers + reportDoers + [httpServerDoer]
 #         limit = 0.25
 #         tock = 0.03125
 #         doist = doing.Doist(limit=limit, tock=tock)
