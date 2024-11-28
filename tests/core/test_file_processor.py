@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 
-from verifier.core.reporting import DOC_INFO, FileProcessor
+from src.verifier.core.reporting import DOC_INFO, FileProcessor
 
 class TestFileProcessor(unittest.TestCase):
     def setUp(self):

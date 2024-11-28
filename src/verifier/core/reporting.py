@@ -14,8 +14,8 @@ from hio.base import doing
 from keri import kering
 from keri.core import Siger
 
-from verifier.core.basing import delete_upload_status, ReportStats, ReportStatus, save_upload_status, UploadStatus
-from verifier.core.utils import DigerBuilder
+from src.verifier.core.basing import delete_upload_status, ReportStats, ReportStatus, save_upload_status, UploadStatus
+from src.verifier.core.utils import DigerBuilder
 
 # help.ogler.level = logging.getLevelName("DEBUG")
 # logger = help.ogler.getLogger()

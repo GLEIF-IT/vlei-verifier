@@ -3,7 +3,7 @@ import os
 import lmdb
 from keri.db import subing, koming
 
-from verifier.core.basing import VerifierBaser
+from src.verifier.core.basing import VerifierBaser
 
 
 def test_vdb():

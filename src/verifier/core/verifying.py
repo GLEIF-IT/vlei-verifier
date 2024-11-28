@@ -4,13 +4,13 @@ import json
 
 from keri.core import coring, parsing
 from keri.vdr import verifying, eventing
-from verifier.core.basing import (
+from src.verifier.core.basing import (
     CRED_CRYPT_INVALID,
     CRED_CRYPT_VALID,
     CredProcessState,
     cred_age_off, AUTH_REVOKED,
 )
-from verifier.core.utils import process_revocations
+from src.verifier.core.utils import process_revocations
 
 
 def setup(app, hby, vdb, reger, local=False):

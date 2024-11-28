@@ -2,7 +2,7 @@ from keri import kering
 from keri.core import MtrDex, coring
 from keri.vdr.eventing import state
 
-from verifier.core.basing import AUTH_REVOKED, CredProcessState
+from src.verifier.core.basing import AUTH_REVOKED, CredProcessState
 
 
 class DigerBuilder:

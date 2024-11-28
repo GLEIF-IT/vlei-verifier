@@ -9,8 +9,8 @@ from keri.vdr import viring
 
 import pytest
 
-from verifier.core import basing, verifying
-from verifier.core.authorizing import Authorizer, Schema
+from src.verifier.core import basing, verifying
+from src.verifier.core.authorizing import Authorizer, Schema
 
 def test_ecr(seeder):
 

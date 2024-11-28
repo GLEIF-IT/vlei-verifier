@@ -9,8 +9,8 @@ from keri.vdr import viring
 
 import pytest
 
-from verifier.core import verifying, basing
-from verifier.core.authorizing import Authorizer, Schema
+from src.verifier.core import verifying, basing
+from src.verifier.core.authorizing import Authorizer, Schema
 
 # @pytest.fixture(autouse=True)
 # def setup():

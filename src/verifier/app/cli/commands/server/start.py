@@ -14,7 +14,7 @@ from keri.app import keeping, configing, habbing, oobiing
 from keri.app.cli.common import existing
 from keri.vdr import viring
 import logging
-from verifier.core import verifying, authorizing, basing, reporting
+from src.verifier.core import verifying, authorizing, basing, reporting
 
 parser = argparse.ArgumentParser(description='Launch vLEI Verification Service')
 parser.set_defaults(handler=lambda args: launch(args),

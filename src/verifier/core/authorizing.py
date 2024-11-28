@@ -13,8 +13,8 @@ from keri import kering
 from keri.core import coring
 from keri.help import helping
 
-from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
-from verifier.core.verifying import CRED_CRYPT_VALID
+from src.verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
+from src.verifier.core.verifying import CRED_CRYPT_VALID
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
 EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Data Submitter"

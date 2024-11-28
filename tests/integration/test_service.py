@@ -8,10 +8,10 @@ import pytest
 import requests
 import threading
 import time
-import verifier.app.cli.commands.server.start as start
-from verifier.core import verifying, basing
-import verifier.core.authorizing as authorizing
-import verifier.core.reporting as reporting
+import src.verifier.app.cli.commands.server.start as start
+from src.verifier.core import verifying, basing
+import src.verifier.core.authorizing as authorizing
+import src.verifier.core.reporting as reporting
 
 host = "localhost"
 port = 7676
