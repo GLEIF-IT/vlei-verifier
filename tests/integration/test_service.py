@@ -33,13 +33,13 @@ def test_service_ecr(seeder):
         #chained ecr auth cred
         eaedge = get_ecr_auth_edge(lsaid,Schema.LE_SCHEMA1)
         
-        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA2, registry=registry, sedge=eaedge, lei=LEI1)
+        eacred = get_ecr_auth_cred(aid=hab.pre, issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_AUTH_SCHEMA2, registry=registry, sedge=eaedge, lei=LEI1, role=ECR_ROLE2)
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner)
         
         #chained ecr auth cred
         ecredge = get_ecr_edge(easaid,Schema.ECR_AUTH_SCHEMA2)
         
-        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge, lei=LEI1)
+        ecr = get_ecr_cred(issuer=hab.pre, recipient=hab.pre, schema=Schema.ECR_SCHEMA, registry=registry, sedge=ecredge, lei=LEI1, role=ECR_ROLE2,)
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner)
         
         app = falcon.App(
@@ -54,7 +54,7 @@ def test_service_ecr(seeder):
         class testCf:
             @staticmethod
             def get():
-                return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
+                return dict(LEIs=[f"{LEI1}",f"{LEI2}"], ECR_Roles=[f"{ECR_ROLE1}",f"{ECR_ROLE2}"])
         authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=testCf)
 
         doers = authDoers + [httpServerDoer]

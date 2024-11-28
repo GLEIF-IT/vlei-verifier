@@ -76,8 +76,20 @@ def setup(hby, vdb, reger, cf):
         raise kering.ConfigurationError(
             "invalid configuration, invalid LEIs in configuration"
         )
+    
+    #mirroring LEI configuration for ECR_Roles below
+    if "ECR_Roles" not in data:
+        raise kering.ConfigurationError(
+            "invalid configuration, no ECR_Roles available to accept"
+        )
+    
+    ecr_roles = data.get("ECR_Roles")
+    if not None and not isinstance(leis, list):
+        raise kering.ConfigurationError(
+            "invalid configuration, invalid ECR_Roles in configuration"
+        )
 
-    authorizer = Authorizer(hby, vdb, reger, leis)
+    authorizer = Authorizer(hby, vdb, reger, leis, ecr_roles)
 
     # These lines representing AID keystate and credential revocation state monitoring.
     # witq = agenting.WitnessInquisitor(hby=hby)
@@ -96,7 +108,7 @@ class Authorizer:
 
     TimeoutAuth = 600
 
-    def __init__(self, hby, vdb, reger, leis):
+    def __init__(self, hby, vdb, reger, leis, ecr_roles):
         """
         Create a Authenticator capable of persistent processing of messages and performing
         web hook calls.
@@ -106,12 +118,14 @@ class Authorizer:
             vdb (VerifierBaser): communication escrow database environment
             reger (Reger): credential registry and database
             leis (list): list of str LEIs to accept credential presentations from
+            ecr_roles (list): list of str ecr_roles to accept
 
         """
         self.hby = hby
         self.vdb = vdb
         self.reger = reger
         self.leis = leis
+        self.ecr_roles = ecr_roles
 
         self.clients = dict()
 
@@ -163,7 +177,7 @@ class Authorizer:
         """Process a fully verified engagement context role vLEI credential presentation
 
         1.  If the LEI filter is configured, ensure the LEI is in the list of acceptable LEIs
-        2.  Ensure the role matches the required role for submission
+        2.  Ensure the role matches the required role(s) for submission
         3.  Save the credential as successful for submission acceptance.
 
         Parameters:
@@ -189,7 +203,7 @@ class Authorizer:
             elif len(self.leis) > 0 and creder.attrib["LEI"] not in self.leis:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
-            elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
+            elif len(self.ecr_roles) > 0 and creder.attrib["engagementContextRole"] not in (self.ecr_roles):
                 res = False, f"{creder.attrib["engagementContextRole"]} is not a valid submitter role"
             elif not (chain := self.chain_filters(creder))[0]:
                 res = chain

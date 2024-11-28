@@ -137,6 +137,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=eaedge,
             lei=LEI1,
+            role=ECR_ROLE2,
         )
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner
@@ -156,7 +157,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], [ECR_ROLE2])
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -172,6 +173,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=ecredge,
             lei=LEI1,
+            role=ECR_ROLE2,
         )
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner
@@ -189,7 +191,7 @@ def test_ecr(seeder):
         )
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], [ECR_ROLE2])
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -235,7 +237,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], [ECR_ROLE2])
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -287,6 +289,7 @@ def test_ecr_missing(seeder):
             registry=registry,
             sedge=eaedge,
             lei=LEI1,
+            role=ECR_ROLE2,
         )
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, eacred, seqner
@@ -329,7 +332,7 @@ def test_ecr_missing(seeder):
 
         hby.kevers[hab.pre] = hab.kever
 
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], [ECR_ROLE2])
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")

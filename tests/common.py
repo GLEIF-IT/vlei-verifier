@@ -14,6 +14,9 @@ from keri.vdr.credentialing import Credentialer, proving
 LEI1 = "254900OPPU84GM83MG36"
 LEI2 = "875500ELOZEL05BVXV37"
 
+ECR_ROLE1 = "EBA Data Submitter"
+ECR_ROLE2 = "EBA Data Admin"
+
 # @pytest.fixture
 # def setup_habs():
 #     with habbing.openHby(name="test", temp=True) as hby, habbing.openHby(
@@ -258,8 +261,8 @@ def get_da_cred(issuer, schema, registry):
 
     return creder   
 
-def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str):
-    sad = dict(get_ecr_data(lei))
+def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str, role: str):
+    sad = dict(get_ecr_data(lei, role))
     sad["AID"]=f'{aid}'
     
     _, ecr_auth = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
@@ -316,17 +319,26 @@ def get_ecr_edge(auth_dig, auth_schema):
   
     return ecr
 
-def get_ecr_data(lei: str):
+def get_ecr_data(lei: str, role="EBA Data Submitter"):
+    #below is the original dictionary which assumes ecr role of EBA Data Submitter
+    # return dict(
+    #     d="",
+    #     personLegalName="Bank User",
+    #     engagementContextRole="EBA Data Submitter",
+    #     LEI=f"{lei}"
+    # )
+
+    #let's create a new dictionary with our variable ecr role
     return dict(
         d="",
         personLegalName="Bank User",
-        engagementContextRole="EBA Data Submitter",
+        engagementContextRole=f"{role}",
         LEI=f"{lei}"
     )
 
-def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str):
+def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str, role: str):
 
-    sad = get_ecr_data(lei)
+    sad = get_ecr_data(lei, role)
 
     _, ecr = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
     

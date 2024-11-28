@@ -58,6 +58,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=eaedge,
             lei=LEI1,
+            role=ECR_ROLE2,
         )
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, ecr_auth_cred, seqner
@@ -68,7 +69,7 @@ def test_ecr(seeder):
         issAndCred.extend(eamsgs)
         acdc = issAndCred.decode("utf-8")
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], [ECR_ROLE2])
         chain_success, chain_msg = auth.chain_filters(ecr_auth_cred)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH"
@@ -86,6 +87,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=ecredge,
             lei=LEI1,
+            role=ECR_ROLE2
         )
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr_cred, seqner
@@ -94,7 +96,7 @@ def test_ecr(seeder):
         issAndCred = bytearray()
         issAndCred.extend(ecmsgs)
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], [ECR_ROLE2])
         chain_success, chain_msg = auth.chain_filters(ecr_cred)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"
