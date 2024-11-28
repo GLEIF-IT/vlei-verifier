@@ -261,7 +261,7 @@ def get_da_cred(issuer, schema, registry):
 
     return creder   
 
-def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str, role: str):
+def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str, role="EBA Data Submitter"):
     sad = dict(get_ecr_data(lei, role))
     sad["AID"]=f'{aid}'
     
@@ -336,7 +336,7 @@ def get_ecr_data(lei: str, role="EBA Data Submitter"):
         LEI=f"{lei}"
     )
 
-def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str, role: str):
+def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str, role="EBA Data Submitter"):
 
     sad = get_ecr_data(lei, role)
 
