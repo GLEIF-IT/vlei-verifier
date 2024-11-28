@@ -1,4 +1,4 @@
-###Added Configuration of ECR_Roles###
+### Added Configuration of ECR_Roles ###
 
 1. Added ECR_Roles to verifier-config-public.json
 "ECR_Roles": []
