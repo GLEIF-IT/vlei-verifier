@@ -4,6 +4,7 @@ import json
 import pytest
 
 from .conftest import *
+from verifier.core.authorizing import DEFAULT_EBA_ROLE
 
 from keri.app import signing
 from keri.core import coring, eventing, parsing, scheming, serdering
@@ -258,7 +259,7 @@ def get_da_cred(issuer, schema, registry):
 
     return creder   
 
-def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str, role="EBA Data Submitter"):
+def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str, role=DEFAULT_EBA_ROLE):
     sad = dict(get_ecr_data(lei, role))
     sad["AID"]=f'{aid}'
     
@@ -316,7 +317,7 @@ def get_ecr_edge(auth_dig, auth_schema):
   
     return ecr
 
-def get_ecr_data(lei: str, role: str = "EBA Data Submitter"):
+def get_ecr_data(lei: str, role: str = DEFAULT_EBA_ROLE):
     return dict(
         d="",
         personLegalName="Bank User",
@@ -324,7 +325,7 @@ def get_ecr_data(lei: str, role: str = "EBA Data Submitter"):
         LEI=f"{lei}"
     )
 
-def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str, role="EBA Data Submitter"):
+def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str, role=DEFAULT_EBA_ROLE):
 
     sad = get_ecr_data(lei, role)
 
