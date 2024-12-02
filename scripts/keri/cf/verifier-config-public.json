@@ -31,7 +31,7 @@
   ],
   "LEIs": [],
 
-  "acceptedRoles": [
-    "EBA_DATA_ADMIN"
+  "ecrRoles": [
+    "EBA Data Submitter"
   ]
 }

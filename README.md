@@ -45,6 +45,13 @@ has never submitted a credential, this API will return a 404.  If the AID has su
 will return a 401.  If the AID has submitted a valid credential that is currently not revoked, this API will return a 200
 with a body that contains the AID and the SAID of the credential.
 
+#### Root Of Trust verification:
+
+By default, the verification of the Root Of Trust is disabled. In order to enable it set the env variable 'VERIFY_ROOT_OF_TRUST=True'. 
+The default root of trust is the GLEIF external(https://github.com/WebOfTrust/WebOfTrust.github.io/blob/main/.well-known/keri/oobi/EDP1vHcw_wc4M__Fj53-cJaBnZZASd-aMTaSyWEQ-PC2/index.json)
+If you are running Keria locally, you will need to add your own Root Of Trust. To do that you need to set the env variable 'VERIFIER_ENV=development'. And then 
+send the POST request to the localhost:7676/root_of_trust/{AID-of-the-root-of-trust} with application/json+cesr format data containing the CESR of the new  Root Of Trust.
+
 ## Peer projects
 ### Webapp
 The web app (UI front-end) uses Signify/KERIA for selecting identifiers and credentials:

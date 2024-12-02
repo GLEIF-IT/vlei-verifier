@@ -52,6 +52,12 @@ class Account:
     lei: str = None
 
 @dataclass
+class RootOfTrust:
+    """ Account dataclass for tracking"""
+    aid: str = None
+
+
+@dataclass
 class ReportStats:
     """ Report statistics dataclass for tracking"""
     submitter: str = None
@@ -136,6 +142,7 @@ class VerifierBaser(dbing.LMDBer):
         self.rev = None
 
         self.accts = None
+        self.root = None
 
         # Report database linking AID of uploader to SAID of uploaded report
         self.rpts = None
@@ -171,6 +178,9 @@ class VerifierBaser(dbing.LMDBer):
 
         # presentations with resolved credentials are granted access
         self.accts = koming.Komer(db=self, subkey='accts', schema=Account)
+
+        # root of trust
+        self.root = koming.Komer(db=self, subkey='root', schema=RootOfTrust)
 
         # Report database linking AID of uploader to DIG of uploaded report
         self.rpts = CesrIoSetSuber(db=self, subkey='rpts.', klas=coring.Diger)
