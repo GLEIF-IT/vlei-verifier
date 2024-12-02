@@ -31,7 +31,7 @@
   ],
   "LEIs": [],
 
-  "acceptedRoles": [
+  "ecrRoles": [
     "EBA_DATA_ADMIN"
   ]
 }
