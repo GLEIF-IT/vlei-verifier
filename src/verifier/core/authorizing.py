@@ -78,7 +78,7 @@ def setup(hby, vdb, reger, cf):
             "invalid configuration, invalid LEIs in configuration"
         )
     
-    accepted_roles = data.get("acceptedRoles", [DEFAULT_EBA_ROLE])
+    accepted_roles = data.get("ecrRoles", [DEFAULT_EBA_ROLE])
     if not isinstance(accepted_roles, list):
         raise kering.ConfigurationError(
             "invalid configuration, invalid Roles in configuration"
