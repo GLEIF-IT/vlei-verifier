@@ -10,7 +10,7 @@ from verifier.core.basing import (
     CredProcessState,
     cred_age_off, AUTH_REVOKED,
 )
-from verifier.core.utils import process_revocations
+from verifier.core.utils import process_revocations, add_root_of_trust
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -28,6 +28,11 @@ def setup(app, hby, vdb, reger, local=False):
     vry = verifying.Verifier(hby=hby, reger=reger)
 
     loadEnds(app, hby, vdb, tvy, vry)
+    with open("./src/root_of_trust_oobis/gleif_external.json", "rb") as f:
+        json_oobi_gleif = json.loads(f.read())
+        aid = json_oobi_gleif.get("aid")
+        vlei = bytes(json_oobi_gleif.get("vlei"), "utf8")
+        add_root_of_trust(vlei, hby, tvy, vry, vdb, aid)
 
 
 def loadEnds(app, hby, vdb, tvy, vry):
@@ -46,12 +51,97 @@ def loadEnds(app, hby, vdb, tvy, vry):
     app.add_route("/health", healthEnd)
     credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
     app.add_route("/presentations/{said}", credEnd)
+    rotEnd = RootOfTrustResourceEndpoint(hby, vdb, tvy, vry)
+    app.add_route("/root_of_trust/{aid}", rotEnd)
     authEnd = AuthorizationResourceEnd(hby, vdb)
     app.add_route("/authorizations/{aid}", authEnd)
     verEnd = RequestVerifierResourceEnd(hby=hby, vdb=vdb)
     app.add_route("/request/verify/{aid}", verEnd)
 
     return []
+
+
+class RootOfTrustResourceEndpoint:
+    """Credential presentation resource endpoint class
+
+    This class allows for a PUT to a credential SAID specific endpoint to trigger credential presentation
+    verification.
+
+    """
+
+    def __init__(self, hby, vdb, tvy, vry):
+        """Create credential presentation resource endpoint instance
+
+        Parameters:
+            hby (Habery): Database environment for exposed KERI AIDs
+            vdb (VerifierBaser): Verifier database environment
+            tvy (Tevery): transaction event log event processor
+            vry (Verifier): credential verification event processor
+
+        """
+        self.hby = hby
+        self.vdb = vdb
+        self.tvy = tvy
+        self.vry = vry
+
+    def on_post(self, req, rep, aid):
+        """Credential Presentation Resource PUT Method
+
+        Parameters:
+            req: falcon.Request HTTP request
+            rep: falcon.Response HTTP response
+            aid: AID of credential being presented
+
+        ---
+         summary: Present vLEI ECR credential for AID authorization to other endpoints
+         description: Present vLEI ECR credential for AID authorization to other endpoints
+         tags:
+            - Credentials
+         parameters:
+           - in: path
+             name: aid
+             schema:
+                type: string
+             description: qb64 SAID of credential being presented
+         requestBody:
+             required: true
+             content:
+                application/json+cesr:
+                  schema:
+                    type: application/json
+                    format: text
+         responses:
+           202:
+              description: Credential Presentation accepted
+
+        """
+        rep.content_type = "application/json"
+
+        if req.content_type not in ("application/json+cesr",):
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(
+                dict(msg=f"invalid content type={req.content_type} for Root Of Trust presentation")
+            ).encode("utf-8")
+            return
+
+        ims = req.bounded_stream.read()
+
+        result = add_root_of_trust(ims, self.hby, self.tvy, self.vry, self.vdb, aid)
+
+        if result:
+            rep.status = falcon.HTTP_ACCEPTED
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Successfully added new Root Of Trust with AID: {aid}",
+                )
+            ).encode("utf-8")
+        else:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Adding new Root Of Trust with AID: {aid} FAILED",
+                )
+            ).encode("utf-8")
 
 
 class PresentationResourceEndpoint:
