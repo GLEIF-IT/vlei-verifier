@@ -156,7 +156,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {"EBA Data Submitter"})
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -172,6 +172,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=ecredge,
             lei=LEI1,
+            role="EBA Data Submitter"
         )
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner
@@ -189,7 +190,7 @@ def test_ecr(seeder):
         )
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {"EBA Data Submitter"})
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -235,7 +236,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {"EBA Data Submitter"})
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -329,7 +330,7 @@ def test_ecr_missing(seeder):
 
         hby.kevers[hab.pre] = hab.kever
 
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {"EBA Data Submitter"})
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
