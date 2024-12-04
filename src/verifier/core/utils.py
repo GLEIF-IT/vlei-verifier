@@ -1,8 +1,10 @@
+import json
+
 from keri import kering
-from keri.core import MtrDex, coring
+from keri.core import MtrDex, coring, parsing
 from keri.vdr.eventing import state
 
-from verifier.core.basing import AUTH_REVOKED, CredProcessState
+from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust
 
 
 class DigerBuilder:
@@ -38,3 +40,22 @@ def process_revocations(vdb, creds, said):
                 rev_state = CredProcessState(said=said, info="Credential was revoked", state=AUTH_REVOKED)
                 vdb.iss.pin(keys=(aid,), val=rev_state)
                 vdb.iss.pin(keys=(said,), val=rev_state)
+
+
+def add_root_of_trust(ims, hby, tvy, vry, vdb, aid):
+    parsing.Parser().parse(ims=ims, kvy=hby.kvy, tvy=tvy, vry=vry)
+    found = False
+    while hby.kvy.cues:
+        msg = hby.kvy.cues.popleft()
+        if "serder" in msg:
+            serder = msg["serder"]
+            if serder.sad.get("i") == aid:
+                found = True
+    if found:
+        root_of_trust = RootOfTrust(aid=aid)
+        vdb.root.pin(keys=(aid,), val=root_of_trust)
+        return True
+    else:
+        return False
+
+

@@ -1,3 +1,4 @@
+from verifier.core.utils import add_root_of_trust
 from ..common import *
 import pdb;
 
@@ -7,12 +8,11 @@ import falcon.testing
 
 from keri.app import habbing
 from keri.core import coring
-from keri.vdr import viring
-
+from keri.vdr import viring, verifying, eventing
 import pytest
 
 from verifier.core import verifying, basing
-from verifier.core.authorizing import Authorizer, Schema
+from verifier.core.authorizing import Authorizer, Schema, DEFAULT_EBA_ROLE
 
 # @pytest.fixture(autouse=True)
 # def setup():
@@ -158,7 +158,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -174,6 +174,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=ecredge,
             lei=LEI1,
+            role=DEFAULT_EBA_ROLE
         )
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr, seqner
@@ -191,7 +192,7 @@ def test_ecr(seeder):
         )
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -237,7 +238,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -331,7 +332,7 @@ def test_ecr_missing(seeder):
 
         hby.kevers[hab.pre] = hab.kever
 
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -359,6 +360,33 @@ def test_ecr_missing(seeder):
             f"/request/verify/{unknown_prefix}", params={"data": data, "sig": cig.qb64}
         )
         assert result.status == falcon.HTTP_404
+
+
+def test_add_root_of_trust(seeder):
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
+        #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+        seeder.seedSchema(db=hby.db)
+
+        app = falcon.App()
+        reger = viring.Reger(name=hby.name, temp=hby.temp)
+        vdb = basing.VerifierBaser(name=hby.name)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=reger)
+        with open("./src/root_of_trust_oobis/test_root_of_trust.json", "rb") as f:
+            json_oobi_gleif = json.loads(f.read())
+            aid = json_oobi_gleif.get("aid")
+            vlei = json_oobi_gleif.get("vlei")
+
+            client = falcon.testing.TestClient(app)
+            result = client.simulate_post(
+                f"/root_of_trust/{aid}",
+                body=vlei,
+                headers={"Content-Type": "application/json+cesr"},
+            )
+            assert result.status == falcon.HTTP_202
+
+
+
+
 
 
 def test_ecr_newschema(seeder):

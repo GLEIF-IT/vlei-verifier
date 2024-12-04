@@ -6,6 +6,8 @@ Verification service main command line handler.  Starts service using the provid
 
 """
 import argparse
+import os
+import re
 
 import falcon
 from hio.core import http
@@ -42,6 +44,19 @@ parser.add_argument('--config-file',
                     default="dkr",
                     help="configuration filename override")
 
+dev_only_endpoints = [r"/root_of_trust/.*"]
+
+
+
+class EnvironmentMiddleware:
+    def process_request(self, req, resp):
+        current_env = os.environ.get('VERIFIER_ENV', 'production')
+        # Restrict access to specific endpoint in non-production environments
+        if any(re.match(pattern, req.path) for pattern in dev_only_endpoints) and current_env == 'production':
+            raise falcon.HTTPForbidden(
+                title="Access Denied",
+                description=f"This endpoint is not accessible in the {current_env} environment."
+            )
 
 def launch(args):
     """ Launch the verification service.
@@ -86,12 +101,16 @@ def launch(args):
 
     reger = viring.Reger(name=hby.name, temp=hby.temp)
     vdb = basing.VerifierBaser(name=hby.name)
+    cors_middleware = falcon.CORSMiddleware(
+        allow_origins='*',
+        allow_credentials='*',
+        expose_headers=['cesr-attachment', 'cesr-date', 'content-type']
+    )
+
+    environment_middleware = EnvironmentMiddleware()
 
     app = falcon.App(
-        middleware=falcon.CORSMiddleware(
-            allow_origins='*',
-            allow_credentials='*',
-            expose_headers=['cesr-attachment', 'cesr-date', 'content-type']))
+        middleware=[cors_middleware, environment_middleware])
 
     server = http.Server(port=httpPort, app=app)
     httpServerDoer = http.ServerDoer(server=server)
