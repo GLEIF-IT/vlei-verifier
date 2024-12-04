@@ -38,10 +38,12 @@ class Schema:
     OOR_SCHEMA = "EBNaNu-M9P5cgrnfl2Fvymy4E_jvxxyjb70PRtiANlJy"
     QVI_SCHEMA1 = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
     QVI_SCHEMA2 = "EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
-    
+    TEST_SCHEMA = "EBvYkhZOz5qEsUFeAmksUclJSh-c6RmQ92SDaAZhAmLF"
+
     schema_names = {}
     schema_names[ECR_AUTH_SCHEMA1] = "ECR_AUTH"
     schema_names[ECR_AUTH_SCHEMA2] = "ECR_AUTH"
+    schema_names[TEST_SCHEMA] = "ECR"
     schema_names[ECR_SCHEMA] = "ECR"
     schema_names[ECR_SCHEMA_PROD] = "ECR"
     schema_names[LE_SCHEMA1] = "LE"
@@ -172,7 +174,7 @@ class Authorizer:
         """
         res = False, f"Cred filters not processed"
         match creder.schema:
-            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
+            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD | Schema.TEST_SCHEMA:
                 # passed schema check
                 res = True, f"passed schema check"
             case _:
@@ -205,7 +207,7 @@ class Authorizer:
         
         cred_type = Schema.schema_names.get(creder.schema)
         match creder.schema:
-            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
+            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD | Schema.TEST_SCHEMA:
                 if creder.edge.get("auth"):
                     # The edge of the ECR_AUTH should come from the same LEI
                     valid_edges = {
