@@ -6,8 +6,8 @@ verfier.core.handling module
 EXN Message handling
 """
 import datetime
+from typing import List, Set
 import os
-from typing import List
 from hio.base import doing
 
 from keri import kering
@@ -18,7 +18,7 @@ from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
 from verifier.core.verifying import CRED_CRYPT_VALID
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
-EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Data Submitter"
+DEFAULT_EBA_ROLE = "EBA Data Submitter"
 
 AUTH_PENDING = "Credential pending authorization"
 AUTH_SUCCESS = "Credential authorized"
@@ -77,8 +77,16 @@ def setup(hby, vdb, reger, cf):
         raise kering.ConfigurationError(
             "invalid configuration, invalid LEIs in configuration"
         )
+    
+    accepted_roles = data.get("ecrRoles", [DEFAULT_EBA_ROLE])
+    if not isinstance(accepted_roles, list):
+        raise kering.ConfigurationError(
+            "invalid configuration, invalid Roles in configuration"
+        )
+    
+    accepted_roles = set(accepted_roles)
 
-    authorizer = Authorizer(hby, vdb, reger, leis)
+    authorizer = Authorizer(hby, vdb, reger, leis, accepted_roles)
 
     # These lines representing AID keystate and credential revocation state monitoring.
     # witq = agenting.WitnessInquisitor(hby=hby)
@@ -97,7 +105,7 @@ class Authorizer:
 
     TimeoutAuth = 600
 
-    def __init__(self, hby, vdb, reger, leis):
+    def __init__(self, hby, vdb, reger, leis, accepted_roles: Set[str]):
         """
         Create a Authenticator capable of persistent processing of messages and performing
         web hook calls.
@@ -107,12 +115,13 @@ class Authorizer:
             vdb (VerifierBaser): communication escrow database environment
             reger (Reger): credential registry and database
             leis (list): list of str LEIs to accept credential presentations from
-
+            accepted_roles (set): set of accepted engagement context roles
         """
         self.hby = hby
         self.vdb = vdb
         self.reger = reger
         self.leis = leis
+        self.accepted_roles = accepted_roles
 
         self.clients = dict()
 
@@ -192,7 +201,7 @@ class Authorizer:
             elif len(self.leis) > 0 and creder.attrib["LEI"] not in self.leis:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
-            elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
+            elif creder.attrib["engagementContextRole"] not in self.accepted_roles:
                 res = False, f"{creder.attrib["engagementContextRole"]} is not a valid submitter role"
             elif not (chain := self.chain_filters(creder))[0]:
                 res = chain
