@@ -454,7 +454,7 @@ def test_ecr_newschema(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -492,7 +492,7 @@ def test_ecr_newschema(seeder):
         )
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1])
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
