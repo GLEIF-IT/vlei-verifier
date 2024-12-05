@@ -1,7 +1,9 @@
 from verifier.core.utils import add_root_of_trust
 from ..common import *
+import pdb;
 
 import falcon
+import re
 import falcon.testing
 
 from keri.app import habbing
@@ -385,3 +387,158 @@ def test_add_root_of_trust(seeder):
 
 
 
+
+
+def test_ecr_newschema(seeder):
+    app = falcon.App()
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
+        vdb = basing.VerifierBaser(name=hby.name, temp=True)
+
+        #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
+        seeder.seedSchema(db=hby.db)
+        regery, registry, verifier, seqner = reg_and_verf(
+            hby, hab, registryName="qvireg"
+        )
+        qvicred = get_qvi_cred(
+            issuer=hab.pre,
+            recipient=hab.pre,
+            schema=Schema.QVI_SCHEMA2,
+            registry=registry,
+            lei=LEI1,
+        )
+        hab, qcrdntler, qsaid, qkmsgs, qtmsgs, qimsgs, qvimsgs = get_cred(
+            hby, hab, regery, registry, verifier, Schema.QVI_SCHEMA2, qvicred, seqner
+        )
+
+        qviedge = get_qvi_edge(qvicred.sad["d"], Schema.QVI_SCHEMA2)
+
+        leicred = get_lei_cred(
+            issuer=hab.pre,
+            recipient=hab.pre,
+            schema=Schema.LE_SCHEMA2,
+            registry=registry,
+            sedge=qviedge,
+            lei=LEI1,
+        )
+        hab, lcrdntler, lsaid, lkmsgs, ltmsgs, limsgs, leimsgs = get_cred(
+            hby, hab, regery, registry, verifier, Schema.LE_SCHEMA2, leicred, seqner
+        )
+
+        # chained ecr auth cred
+        eaedge = get_ecr_auth_edge(lsaid, Schema.LE_SCHEMA2)
+
+        eacred = get_ecr_auth_cred(
+            aid=hab.pre,
+            issuer=hab.pre,
+            recipient=hab.pre,
+            schema=Schema.ECR_AUTH_SCHEMA1,
+            registry=registry,
+            sedge=eaedge,
+            lei=LEI1,
+        )
+        hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
+            hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA1, eacred, seqner
+        )
+
+        # try submitting the ECR auth cred
+        issAndCred = bytearray()
+        issAndCred.extend(eamsgs)
+        acdc = issAndCred.decode("utf-8")
+        client = falcon.testing.TestClient(app)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eacrdntler.rgy.reger)
+        result = client.simulate_put(
+            f"/presentations/{easaid}",
+            body=acdc,
+            headers={"Content-Type": "application/json+cesr"},
+        )
+        # ecr auth cred is verified to be a valid credential
+        assert result.status == falcon.HTTP_202
+        hby.kevers[hab.pre] = hab.kever
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth.processPresentations()
+        # ecr auth cred is not authorized
+        result = client.simulate_get(f"/authorizations/{hab.pre}")
+        # assert result.status == falcon.HTTP_OK
+
+        # chained ecr auth cred
+        ecredge = get_ecr_edge(easaid, Schema.ECR_AUTH_SCHEMA1)
+        print(ecredge)
+        ecr = get_ecr_cred(
+            issuer=hab.pre,
+            recipient=hab.pre,
+            schema=Schema.TEST_SCHEMA,
+            registry=registry,
+            sedge=ecredge,
+            lei=LEI1,
+        )
+        print(ecr.said)
+        print(ecr.issuer)
+        print(ecr.edge)
+        print("ecr")
+        hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
+            hby, hab, regery, registry, verifier, Schema.TEST_SCHEMA, ecr, seqner
+        )
+
+
+        issAndCred = bytearray()
+        issAndCred.extend(ecmsgs)
+        acdc = issAndCred.decode("utf-8")
+        client = falcon.testing.TestClient(app)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
+        result = client.simulate_put(
+            f"/presentations/{ecsaid}",
+            body=acdc,
+            headers={"Content-Type": "application/json+cesr"},
+        )
+        assert result.status == falcon.HTTP_202
+        hby.kevers[hab.pre] = hab.kever
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth.processPresentations()
+
+        result = client.simulate_get(f"/authorizations/{hab.pre}")
+        assert result.status == falcon.HTTP_OK
+        assert result.json['aid'] == hab.pre
+        assert result.json['said'] == ecsaid
+        assert result.json['lei'] == LEI1
+        assert result.json['msg'] == f"AID {hab.pre} w/ lei {LEI1} has valid login account"
+
+        data = "this is the raw data"
+        raw = data.encode("utf-8")
+        cig = hab.sign(ser=raw, indexed=False)[0]
+        assert (
+            cig.qb64
+            == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
+        )
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
+        result = client.simulate_post(
+            f"/request/verify/{hab.pre}", params={"data": data, "sig": cig.qb64}
+        )
+        assert result.status == falcon.HTTP_202
+
+        data = '"@method": GET\n"@path": /verify/header\n"signify-resource": EHYfRWfM6RxYbzyodJ6SwYytlmCCW2gw5V-FsoX5BgGx\n"signify-timestamp": 2024-05-01T19:54:53.571000+00:00\n"@signature-params: (@method @path signify-resource signify-timestamp);created=1714593293;keyid=BOieebDzg4uaqZ2zuRAX1sTiCrD3pgGT3HtxqSEAo05b;alg=ed25519"'
+        raw = data.encode("utf-8")
+        cig = hab.sign(ser=raw, indexed=False)[0]
+        assert (
+            cig.qb64
+            == "0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP"
+        )
+        assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
+
+        # try submitting the ECR auth cred now that we're already authorized
+        issAndCred = bytearray()
+        issAndCred.extend(eamsgs)
+        acdc = issAndCred.decode("utf-8")
+        client = falcon.testing.TestClient(app)
+        verifying.setup(app=app, hby=hby, vdb=vdb, reger=eacrdntler.rgy.reger)
+        result = client.simulate_put(
+            f"/presentations/{easaid}",
+            body=acdc,
+            headers={"Content-Type": "application/json+cesr"},
+        )
+        match = re.search(r'"d":"([^"]+)"', acdc)
+        cred_value = match.group(1)
+
+        # ecr auth cred is verified to be a valid credential
+        assert result.status == falcon.HTTP_202
+
+        assert result.json.get('msg') == f"{cred_value} for {hab.pre} as issuee is Credential cryptographically valid"
