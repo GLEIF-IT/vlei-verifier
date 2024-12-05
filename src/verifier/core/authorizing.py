@@ -15,10 +15,11 @@ from keri.core import coring
 from keri.help import helping
 
 from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
+from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
 from verifier.core.verifying import CRED_CRYPT_VALID
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
-EBA_DOCUMENT_SUBMITTER_ROLE = "EBA Data Submitter"
+
 
 AUTH_PENDING = "Credential pending authorization"
 AUTH_SUCCESS = "Credential authorized"
@@ -27,30 +28,6 @@ AUTH_EXPIRE = "Credential authorization expired"
 
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
-class Schema:
-    DES_ALIASES_SCHEMA = "EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
-    ECR_AUTH_SCHEMA1 = "EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g"
-    ECR_AUTH_SCHEMA2 = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
-    ECR_SCHEMA = "EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP"
-    ECR_SCHEMA_PROD = "EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw"
-    LE_SCHEMA1 = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
-    LE_SCHEMA2 = "ENPXp1vQzRF6JwIuS-mp2U8Uf1MoADoP_GqQ62VsDZWY"
-    OOR_AUTH_SCHEMA = "EKA57bKBKxr_kN7iN5i7lMUxpMG-s19dRcmov1iDxz-E"
-    OOR_SCHEMA = "EBNaNu-M9P5cgrnfl2Fvymy4E_jvxxyjb70PRtiANlJy"
-    QVI_SCHEMA1 = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
-    QVI_SCHEMA2 = "EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
-
-    schema_names = {}
-    schema_names[ECR_AUTH_SCHEMA1] = "ECR_AUTH"
-    schema_names[ECR_AUTH_SCHEMA2] = "ECR_AUTH"
-    schema_names[ECR_SCHEMA] = "ECR"
-    schema_names[ECR_SCHEMA_PROD] = "ECR"
-    schema_names[LE_SCHEMA1] = "LE"
-    schema_names[LE_SCHEMA2] = "LE"
-    schema_names[OOR_AUTH_SCHEMA] = "OOR_AUTH"
-    schema_names[OOR_SCHEMA] = "OOR"
-    schema_names[QVI_SCHEMA1] = "QVI"
-    schema_names[QVI_SCHEMA2] = "QVI"
 
 
 def setup(hby, vdb, reger, cf):
@@ -73,7 +50,7 @@ def setup(hby, vdb, reger, cf):
         )
 
     leis = data.get("LEIs")
-    if not None and not isinstance(leis, list):
+    if leis is not None and not isinstance(leis, list):
         raise kering.ConfigurationError(
             "invalid configuration, invalid LEIs in configuration"
         )
@@ -192,7 +169,7 @@ class Authorizer:
             elif len(self.leis) > 0 and creder.attrib["LEI"] not in self.leis:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
-            elif creder.attrib["engagementContextRole"] not in (EBA_DOCUMENT_SUBMITTER_ROLE,):
+            elif creder.attrib["engagementContextRole"] not in (EBA_DATA_SUBMITTER_ROLE,):
                 res = False, f"{creder.attrib["engagementContextRole"]} is not a valid submitter role"
             elif not (chain := self.chain_filters(creder))[0]:
                 res = chain
