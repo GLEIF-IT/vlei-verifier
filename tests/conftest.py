@@ -968,6 +968,132 @@ class DbSeed:
         # NEW: EPhh9YQUM1vuIpjvxFCb9pS7lq3YjQRRWtQ4xUiEcPNV
         assert schemer.said == Schema.ECR_SCHEMA
         db.schema.pin(schemer.said, schemer)
+
+        sad = {
+  "$id": "EBvYkhZOz5qEsUFeAmksUclJSh-c6RmQ92SDaAZhAmLF",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ECR Authorization vLEI Credential",
+  "description": "A vLEI Authorization Credential issued by a Legal Entity to a QVI for the authorization of ECR credentials",
+  "type": "object",
+  "credentialType": "ECRAuthorizationvLEICredential",
+  "version": "1.0.0",
+  "properties": {
+    "v": {
+      "description": "Version",
+      "type": "string"
+    },
+    "d": {
+      "description": "Credential SAID",
+      "type": "string"
+    },
+    "u": {
+      "description": "One time use nonce",
+      "type": "string"
+    },
+    "i": {
+      "description": "LE Issuer AID",
+      "type": "string"
+    },
+    "ri": {
+      "description": "Credential status registry",
+      "type": "string"
+    },
+    "s": {
+      "description": "Schema SAID",
+      "type": "string"
+    },
+    "a": {
+          "$id": "EBMwtCJt7LUfA9u0jmZ1cAoCavZFIBmZBmlufYeX4gdy",
+          "description": "Attributes block",
+          "type": "object",
+          "properties": {
+            "d": {
+              "description": "Attributes block SAID",
+              "type": "string"
+            },
+            "u": {
+              "description": "A salty nonce",
+              "type": "string"
+            },
+            "i": {
+              "description": "QVI Issuee AID",
+              "type": "string"
+            },
+            "dt": {
+              "description": "Issuance date time",
+              "type": "string",
+              "format": "date-time"
+            },
+            "AID": {
+              "description": "AID of the intended recipient of the ECR credential",
+              "type": "string"
+            },
+            "LEI": {
+              "description": "LEI of the requesting Legal Entity",
+              "type": "string",
+              "format": "ISO 17442"
+            },
+            "personLegalName": {
+              "description": "Requested recipient name as provided during identity assurance",
+              "type": "string"
+            },
+            "engagementContextRole": {
+              "description": "Requested role description i.e. 'Head of Standards'",
+              "type": "string"
+            }
+          }
+        }
+    },
+    "e": {
+      "oneOf": [
+        {
+          "description": "Edges block SAID",
+          "type": "string"
+        },
+        {
+          "$id": "EB6E1GJvVen5NqkKb2TG5jqX66vYOL3md-xkXQqQBySX",
+          "description": "Edges block",
+          "type": "object",
+          "properties": {
+            "d": {
+              "description": "Edges block SAID",
+              "type": "string"
+            },
+            "le": {
+              "description": "Chain to legal entity vLEI credential",
+              "type": "object",
+              "properties": {
+                "n": {
+                  "description": "QVI Issuer credential SAID",
+                  "type": "string"
+                },
+                "s": {
+                  "description": "SAID of required schema of the credential pointed to by this node",
+                  "type": "string",
+                  "const": "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
+                }
+              },
+              "additionalProperties": False,
+              "required": [
+                "n",
+                "s"
+              ]
+            }
+          },
+          "additionalProperties": False,
+          "required": [
+            "d",
+            "le"
+          ]
+        }
+      ]
+    }
+  }
+        _, sad = coring.Saider.saidify(sad, label=coring.Saids.dollar)
+        schemer = scheming.Schemer(sed=sad)
+        # NEW: EPhh9YQUM1vuIpjvxFCb9pS7lq3YjQRRWtQ4xUiEcPNV
+        assert schemer.said == Schema.TEST_SCHEMA
+        db.schema.pin(schemer.said, schemer)
         
         sad = {
             "$id": "",

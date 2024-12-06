@@ -71,8 +71,8 @@ Configuration files are located in the following directory:
 
 You can customize the service behavior using these configuration options:  
 
-- **`iurls`**: -
-- **`durls`**: -
+- **`iurls`**: - OOBI URLs
+- **`durls`**: - Schema OOBI URLs
 - **`trustedLeis`**: A list of trusted LE identifiers.  
 - **`allowedEcrRoles`**: Roles permitted for ECR credential authorization.  
 - **`allowedOorRoles`**: Roles permitted for OOR credential authorization.  
@@ -86,6 +86,14 @@ You can customize the service behavior using these configuration options:
 python verifier.py --config-dir=scripts --config-file='verifier-config-public.json'
 ```
 
+## Verifier Endpoints:
+
+### POST /presentations/{said}
+    This endpoint performs cryptographic verification of the Credential(provided in a CESR format in request body).
+### GET /authorizations/{aid}
+    Using the AID from the request responds with the actual authorization status for the AID.
+### GET /request/verify
+    This endpoint performs Signed Headers verification
 
 # Peer projects
 ### Webapp

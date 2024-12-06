@@ -161,6 +161,7 @@ class Authorizer:
 
         """
         res = False, f"Cred filters not processed"
+        print("SCHEMA!!: ", creder.schema, self.env.authAllowedSchemas)
         if creder.schema in self.env.authAllowedSchemas:
             res = True, f"passed schema check"
         elif Schema.schema_names.get(creder.schema):
@@ -194,7 +195,7 @@ class Authorizer:
         chain_msg = f"Unknown credential schema type {creder.schema} not supported"
         cred_type = Schema.schema_names.get(creder.schema)
         match creder.schema:
-            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD:
+            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD | Schema.TEST_SCHEMA:
                 if creder.edge.get("auth"):
                     # The edge of the ECR_AUTH should come from the same LEI
                     valid_edges = {
