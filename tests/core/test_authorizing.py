@@ -1,3 +1,4 @@
+from verifier.core.resolve_env import VerifierEnvironment
 from ..common import *
 
 import falcon
@@ -11,6 +12,32 @@ import pytest
 
 from verifier.core import basing, verifying
 from verifier.core.authorizing import Authorizer, Schema, DEFAULT_EBA_ROLE
+
+
+@pytest.fixture(autouse=True)
+def setup():
+    allowed_schemas = [
+        getattr(Schema, x) for x in ("ECR_SCHEMA", "ECR_SCHEMA_PROD", "TEST_SCHEMA")
+    ]
+    allowed_ecr_roles = [
+        "EBA Data Submitter",
+        "EBA Data Admin"
+    ]
+    allowed_oor_roles = []
+    verifier_mode = os.environ.get("VERIFIER_ENV", "production")
+    trusted_leis = []
+    verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
+
+    ve_init_params = {
+        "mode": verifier_mode,
+        "trustedLeis": trusted_leis if trusted_leis else [],
+        "verifyRootOfTrust": verify_rot,
+        "authAllowedSchemas": allowed_schemas,
+        "authAllowedEcrRoles": allowed_ecr_roles,
+        "authAllowedOorRoles": allowed_oor_roles
+    }
+
+    VerifierEnvironment.initialize(**ve_init_params)
 
 def test_ecr(seeder):
 
@@ -69,7 +96,7 @@ def test_ecr(seeder):
         issAndCred.extend(eamsgs)
         acdc = issAndCred.decode("utf-8")
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         chain_success, chain_msg = auth.chain_filters(ecr_auth_cred)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH"
@@ -96,7 +123,7 @@ def test_ecr(seeder):
         issAndCred = bytearray()
         issAndCred.extend(ecmsgs)
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger)
         chain_success, chain_msg = auth.chain_filters(ecr_cred)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"
@@ -116,7 +143,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=eaedge,
             lei=LEI1,
-            role="EBA_DATA_ADMIN"
+            role="EBA Data Admin"
         )
         hab, eacrdntler, easaid, eakmsgs, eatmsgs, eaimsgs, eamsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, ecr_auth_cred, seqner
@@ -127,7 +154,7 @@ def test_ecr(seeder):
         issAndCred.extend(eamsgs)
         acdc = issAndCred.decode("utf-8")
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {"EBA_DATA_ADMIN"})
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         chain_success, chain_msg = auth.chain_filters(ecr_auth_cred)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH"
@@ -145,7 +172,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=ecredge,
             lei=LEI1,
-            role="EBA_DATA_ADMIN"
+            role="EBA Data Admin"
         )
         hab, eccrdntler, ecsaid, eckmsgs, ectmsgs, ecimsgs, ecmsgs = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr_cred, seqner
@@ -154,7 +181,7 @@ def test_ecr(seeder):
         issAndCred = bytearray()
         issAndCred.extend(ecmsgs)
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {"EBA_DATA_ADMIN"})
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger)
         chain_success, chain_msg = auth.chain_filters(ecr_cred)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"
@@ -162,18 +189,9 @@ def test_ecr(seeder):
         assert passed_filters
         assert msg == f"Credential passed filters for user {hab.pre} with LEI {LEI1}"
 
-        # Verify that the same credential fails with default role authorizer
-        auth_default = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
-        chain_success, chain_msg = auth_default.chain_filters(ecr_cred)
-        assert chain_success
-        assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"
-        passed_filters, msg = auth_default.cred_filters(ecr_cred)
-        assert not passed_filters
-        assert "is not a valid submitter role" in msg
-
         # Test with multiple roles
-        # Authorizer that accepts both default role and "EBA_DATA_ADMIN"
-        multi_role_auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE, "EBA_DATA_ADMIN"})
+        # Authorizer that accepts both default role and "EBA Data Admin"
+        multi_role_auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
 
         # Test credential with default role
         ecr_auth_cred_default = get_ecr_auth_cred(
@@ -190,7 +208,7 @@ def test_ecr(seeder):
             hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, ecr_auth_cred_default, seqner
         )
 
-        # Test credential with EBA_DATA_ADMIN role
+        # Test credential with EBA Data Admin role
         ecr_auth_cred_admin = get_ecr_auth_cred(
             aid=hab.pre,
             issuer=hab.pre,
@@ -199,7 +217,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=eaedge,
             lei=LEI1,
-            role="EBA_DATA_ADMIN"
+            role="EBA Data Admin"
         )
         hab, eacrdntler_admin, easaid_admin, eakmsgs_admin, eatmsgs_admin, eaimsgs_admin, eamsgs_admin = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_AUTH_SCHEMA2, ecr_auth_cred_admin, seqner
@@ -248,7 +266,7 @@ def test_ecr(seeder):
             registry=registry,
             sedge=ecredge_admin,
             lei=LEI1,
-            role="EBA_DATA_ADMIN"
+            role="EBA Data Admin"
         )
         hab, eccrdntler_admin, ecsaid_admin, eckmsgs_admin, ectmsgs_admin, ecimsgs_admin, ecmsgs_admin = get_cred(
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr_cred_admin, seqner
@@ -285,7 +303,7 @@ def test_ecr(seeder):
             hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr_cred_invalid, seqner
         )
 
-        auth = Authorizer(hby, vdb, eccrdntler_invalid.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE, "EBA Data Admin"})
+        auth = Authorizer(hby, vdb, eccrdntler_invalid.rgy.reger)
         chain_success, chain_msg = auth.chain_filters(ecr_cred_invalid)
         assert chain_success
         assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"

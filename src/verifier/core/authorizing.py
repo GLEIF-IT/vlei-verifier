@@ -8,6 +8,7 @@ EXN Message handling
 import datetime
 from typing import List, Set
 import os
+from typing import List
 from hio.base import doing
 
 from keri import kering
@@ -15,6 +16,8 @@ from keri.core import coring
 from keri.help import helping
 
 from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
+from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
+from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.verifying import CRED_CRYPT_VALID
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
@@ -27,35 +30,9 @@ AUTH_EXPIRE = "Credential authorization expired"
 
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
-class Schema:
-    DES_ALIASES_SCHEMA = "EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5"
-    ECR_AUTH_SCHEMA1 = "EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g"
-    ECR_AUTH_SCHEMA2 = "EJOkgTilEMjPgrEr0yZDS_MScnI0pBb75tO54lvXugOy"
-    ECR_SCHEMA = "EHAuBf02w-FIH8yEVrD_qIkgr0uI_rDzZ-kTABmdmUFP"
-    ECR_SCHEMA_PROD = "EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw"
-    LE_SCHEMA1 = "EHyKQS68x_oWy8_vNmYubA5Y0Tse4XMPFggMfoPoERaM"
-    LE_SCHEMA2 = "ENPXp1vQzRF6JwIuS-mp2U8Uf1MoADoP_GqQ62VsDZWY"
-    OOR_AUTH_SCHEMA = "EKA57bKBKxr_kN7iN5i7lMUxpMG-s19dRcmov1iDxz-E"
-    OOR_SCHEMA = "EBNaNu-M9P5cgrnfl2Fvymy4E_jvxxyjb70PRtiANlJy"
-    QVI_SCHEMA1 = "EFgnk_c08WmZGgv9_mpldibRuqFMTQN-rAgtD-TCOwbs"
-    QVI_SCHEMA2 = "EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
-    TEST_SCHEMA = "EBvYkhZOz5qEsUFeAmksUclJSh-c6RmQ92SDaAZhAmLF"
-
-    schema_names = {}
-    schema_names[ECR_AUTH_SCHEMA1] = "ECR_AUTH"
-    schema_names[ECR_AUTH_SCHEMA2] = "ECR_AUTH"
-    schema_names[TEST_SCHEMA] = "ECR"
-    schema_names[ECR_SCHEMA] = "ECR"
-    schema_names[ECR_SCHEMA_PROD] = "ECR"
-    schema_names[LE_SCHEMA1] = "LE"
-    schema_names[LE_SCHEMA2] = "LE"
-    schema_names[OOR_AUTH_SCHEMA] = "OOR_AUTH"
-    schema_names[OOR_SCHEMA] = "OOR"
-    schema_names[QVI_SCHEMA1] = "QVI"
-    schema_names[QVI_SCHEMA2] = "QVI"
 
 
-def setup(hby, vdb, reger, cf):
+def setup(hby, vdb, reger):
     """
 
     Parameters:
@@ -68,27 +45,27 @@ def setup(hby, vdb, reger, cf):
         list: list of doers (coroutines) to run for this module
 
     """
-    data = dict(cf.get())
-    if "LEIs" not in data:
-        raise kering.ConfigurationError(
-            "invalid configuration, no LEIs available to accept"
-        )
-
-    leis = data.get("LEIs")
-    if not None and not isinstance(leis, list):
+    env = VerifierEnvironment.resolve_env()
+    print(env)
+    leis = env.trustedLeis
+    if leis is not None and not isinstance(leis, list):
         raise kering.ConfigurationError(
             "invalid configuration, invalid LEIs in configuration"
         )
 
-    accepted_roles = data.get("ecrRoles", [DEFAULT_EBA_ROLE])
+    accepted_roles = env.authAllowedEcrRoles
     if not isinstance(accepted_roles, list):
         raise kering.ConfigurationError(
-            "invalid configuration, invalid Roles in configuration"
+            "invalid configuration, invalid ECR Roles in configuration"
         )
 
-    accepted_roles = set(accepted_roles)
+    accepted_roles = env.authAllowedOorRoles
+    if not isinstance(accepted_roles, list):
+        raise kering.ConfigurationError(
+            "invalid configuration, invalid OOR Roles in configuration"
+        )
 
-    authorizer = Authorizer(hby, vdb, reger, leis, accepted_roles)
+    authorizer = Authorizer(hby, vdb, reger)
 
     # These lines representing AID keystate and credential revocation state monitoring.
     # witq = agenting.WitnessInquisitor(hby=hby)
@@ -107,7 +84,7 @@ class Authorizer:
 
     TimeoutAuth = 600
 
-    def __init__(self, hby, vdb, reger, leis, accepted_roles: Set[str]):
+    def __init__(self, hby, vdb, reger):
         """
         Create a Authenticator capable of persistent processing of messages and performing
         web hook calls.
@@ -119,11 +96,10 @@ class Authorizer:
             leis (list): list of str LEIs to accept credential presentations from
             accepted_roles (set): set of accepted engagement context roles
         """
+        self.env = VerifierEnvironment.resolve_env()
         self.hby = hby
         self.vdb = vdb
         self.reger = reger
-        self.leis = leis
-        self.accepted_roles = accepted_roles
 
         self.clients = dict()
 
@@ -162,7 +138,7 @@ class Authorizer:
                 creder = self.reger.creds.get(keys=(state.said,))
                 # are there multiple creds for the same said?
                 passed_cred_filters, info = self.cred_filters(creder)
-                if (passed_cred_filters):
+                if passed_cred_filters:
                     cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS, info=info)
                     acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
                     self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
@@ -185,26 +161,28 @@ class Authorizer:
 
         """
         res = False, f"Cred filters not processed"
-        match creder.schema:
-            case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD | Schema.TEST_SCHEMA:
-                # passed schema check
-                res = True, f"passed schema check"
-            case _:
-                if Schema.schema_names.get(creder.schema):
-                    res = False, f"Can't authorize cred with {Schema.schema_names[creder.schema]} schema"
-                else:
-                    res = False, f"Can't authorize cred with unknown schema {creder.schema}"
+        print("SCHEMA!!: ", creder.schema, self.env.authAllowedSchemas)
+        if creder.schema in self.env.authAllowedSchemas:
+            res = True, f"passed schema check"
+        elif Schema.schema_names.get(creder.schema):
+            res = False, f"Can't authorize cred with {Schema.schema_names[creder.schema]} schema"
+        else:
+            res = False, f"Can't authorize cred with unknown schema {creder.schema}"
 
         if res[0]:
             if creder.issuer not in self.hby.kevers:
                 res = False, f"unknown issuer {creder.issuer}"
-            elif creder.attrib["i"] == None or creder.attrib["i"] not in self.hby.kevers:
+            elif creder.attrib["i"] is None or creder.attrib["i"] not in self.hby.kevers:
                 print(f"unknown issuee {creder.attrib["i"]}")
-            elif len(self.leis) > 0 and creder.attrib["LEI"] not in self.leis:
+            elif len(self.env.trustedLeis) > 0 and creder.attrib["LEI"] not in self.env.trustedLeis:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
-            elif creder.attrib["engagementContextRole"] not in self.accepted_roles:
+            elif (creder.schema in (Schema.ECR_SCHEMA, Schema.ECR_SCHEMA_PROD)
+                  and creder.attrib["engagementContextRole"] not in self.env.authAllowedEcrRoles):
                 res = False, f"{creder.attrib["engagementContextRole"]} is not a valid submitter role"
+            elif (creder.schema in (Schema.OOR_SCHEMA,)
+                  and creder.attrib["officialRole"] not in self.env.authAllowedOorRoles):
+                res = False, f"{creder.attrib["officialRole"]} is not a valid submitter role"
             elif not (chain := self.chain_filters(creder))[0]:
                 res = chain
             else:
@@ -213,10 +191,8 @@ class Authorizer:
         return res
 
     def chain_filters(self, creder) -> tuple[bool, str]:
-        cred_type = "NON_VLEI"
         chain_success = False
         chain_msg = f"Unknown credential schema type {creder.schema} not supported"
-
         cred_type = Schema.schema_names.get(creder.schema)
         match creder.schema:
             case Schema.ECR_SCHEMA | Schema.ECR_SCHEMA_PROD | Schema.TEST_SCHEMA:
@@ -237,7 +213,27 @@ class Authorizer:
                     chain_success, chain_msg = self.edge_filters(cred_type, creder.edge["le"], valid_edges=valid_edges)
                 else:
                     chain_success, chain_msg = (False, f"Unexpected {cred_type} cred edge {creder.edge}")
+            case Schema.OOR_SCHEMA:
+                if creder.edge.get("auth"):
+                    # The edge of the OOR_AUTH should come from the same LEI
+                    valid_edges = {
+                        Schema.OOR_AUTH_SCHEMA: {"LEI": creder.attrib["LEI"]}
+                    }
+                    chain_success, chain_msg = self.edge_filters(cred_type, creder.edge["auth"],
+                                                                 valid_edges=valid_edges)
+                else:
+                    chain_success, chain_msg = (False, f"Unexpected {cred_type} cred edge {creder.edge}")
             case Schema.ECR_AUTH_SCHEMA1 | Schema.ECR_AUTH_SCHEMA2:
+                if creder.edge.get("le"):
+                    # The edge of the LE should come from the same LEI
+                    valid_edges = {
+                        Schema.LE_SCHEMA1: {"LEI": creder.attrib["LEI"]},
+                        Schema.LE_SCHEMA2: {"LEI": creder.attrib["LEI"]}
+                    }
+                    chain_success, chain_msg = self.edge_filters(cred_type, creder.edge["le"], valid_edges=valid_edges)
+                else:
+                    chain_success, chain_msg = (False, f"Unexpected {cred_type} cred edge {creder.edge}")
+            case Schema.OOR_AUTH_SCHEMA:
                 if creder.edge.get("le"):
                     # The edge of the LE should come from the same LEI
                     valid_edges = {
@@ -260,12 +256,13 @@ class Authorizer:
                 if creder.edge:
                     chain_success, chain_msg = (False, f"Unexpected {cred_type} cred edge {creder.edge}")
                 else:
-                    if os.getenv("VERIFY_ROOT_OF_TRUST", False):
+                    if self.env.verifyRootOfTrust:
                         issuer_aid = creder.sad.get("i")
                         if self.vdb.root.get(keys=(issuer_aid,)):
                             chain_success, chain_msg = (True, "QVI")
                         else:
-                            chain_success, chain_msg = (False, "The issuer of the QVI credential is not a valid Root Of Trust")
+                            chain_success, chain_msg = (
+                                False, "The issuer of the QVI credential is not a valid Root Of Trust")
                     else:
                         chain_success, chain_msg = (True, "QVI")
             # TODO add logic related to GLEIF external and internal

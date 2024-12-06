@@ -14,5 +14,12 @@
     "http://host.docker.internal:7723/oobi/EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g",
     "http://host.docker.internal:7723/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
   ],
-  "LEIs": []
+  "trustedLeis": [],
+  "allowedEcrRoles": [
+    "EBA Data Submitter"
+  ],
+  "allowedSchemas": [
+    "ECR_SCHEMA",
+    "ECR_SCHEMA_PROD"
+  ]
 }

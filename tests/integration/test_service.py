@@ -1,3 +1,4 @@
+from verifier.core.resolve_env import VerifierEnvironment
 from ..common import *
 
 import falcon
@@ -16,6 +17,32 @@ import verifier.core.reporting as reporting
 host = "localhost"
 port = 7676
 url = f"http://{host}:{port}"
+
+@pytest.fixture(autouse=True)
+def setup():
+    allowed_schemas = [
+        getattr(Schema, x) for x in ("ECR_SCHEMA", "ECR_SCHEMA_PROD")
+    ]
+    allowed_ecr_roles = [
+        "EBA Data Submitter",
+        "EBA Data Admin"
+    ]
+    allowed_oor_roles = []
+    verifier_mode = os.environ.get("VERIFIER_ENV", "production")
+    trusted_leis = []
+    verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
+
+    ve_init_params = {
+        "mode": verifier_mode,
+        "trustedLeis": trusted_leis if trusted_leis else [],
+        "verifyRootOfTrust": verify_rot,
+        "authAllowedSchemas": allowed_schemas,
+        "authAllowedEcrRoles": allowed_ecr_roles,
+        "authAllowedOorRoles": allowed_oor_roles
+    }
+
+    VerifierEnvironment.initialize(**ve_init_params)
+
 
 def test_service_ecr(seeder):        
     with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
@@ -55,7 +82,7 @@ def test_service_ecr(seeder):
             @staticmethod
             def get():
                 return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
-        authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger, cf=testCf)
+        authDoers = authorizing.setup(hby, vdb=vdb, reger=eccrdntler.rgy.reger)
 
         doers = authDoers + [httpServerDoer]
         limit = 0.25

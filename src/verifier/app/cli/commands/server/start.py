@@ -17,6 +17,8 @@ from keri.app.cli.common import existing
 from keri.vdr import viring
 import logging
 from verifier.core import verifying, authorizing, basing, reporting
+from verifier.core.constants import Schema
+from verifier.core.resolve_env import VerifierEnvironment
 
 parser = argparse.ArgumentParser(description='Launch vLEI Verification Service')
 parser.set_defaults(handler=lambda args: launch(args),
@@ -47,7 +49,6 @@ parser.add_argument('--config-file',
 dev_only_endpoints = [r"/root_of_trust/.*"]
 
 
-
 class EnvironmentMiddleware:
     def process_request(self, req, resp):
         current_env = os.environ.get('VERIFIER_ENV', 'production')
@@ -58,6 +59,7 @@ class EnvironmentMiddleware:
                 description=f"This endpoint is not accessible in the {current_env} environment."
             )
 
+
 def launch(args):
     """ Launch the verification service.
 
@@ -67,6 +69,7 @@ def launch(args):
     Returns:
 
     """
+
     name = args.name
     base = args.base
     bran = args.bran
@@ -88,9 +91,34 @@ def launch(args):
                             temp=False,
                             reopen=True,
                             clear=False)
-    
-    help.ogler.level = logging.DEBUG
 
+    help.ogler.level = logging.DEBUG
+    config = cf.get()
+    allowed_schemas = [
+        getattr(Schema, x) for x in config.get("allowedSchemas", []) if getattr(Schema, x, None)
+    ]
+    allowed_ecr_roles = config.get("allowedEcrRoles", [])
+    allowed_oor_roles = config.get("allowedOorRoles", [])
+    verifier_mode = os.environ.get("VERIFIER_ENV", "production")
+    trusted_leis = config.get("trustedLeis", [])
+    verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
+
+    ve_init_params = {
+        "configuration": cf,
+        "mode": verifier_mode,
+        "trustedLeis": trusted_leis if trusted_leis else [],
+        "verifyRootOfTrust": verify_rot,
+    }
+
+    print("ALLOWED", allowed_schemas)
+    if allowed_schemas:
+        ve_init_params["authAllowedSchemas"] = allowed_schemas
+    if allowed_ecr_roles:
+        ve_init_params["authAllowedEcrRoles"] = allowed_ecr_roles
+    if allowed_oor_roles:
+        ve_init_params["authAllowedOorRoles"] = allowed_oor_roles
+
+    ve = VerifierEnvironment.initialize(**ve_init_params)
     if aeid is None:
         hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf)
     else:
@@ -117,7 +145,7 @@ def launch(args):
 
     verifying.setup(app, hby=hby, vdb=vdb, reger=reger)
     reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
-    authDoers = authorizing.setup(hby, vdb=vdb, reger=reger, cf=cf)
+    authDoers = authorizing.setup(hby, vdb=vdb, reger=reger)
 
     doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer]
 

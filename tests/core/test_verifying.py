@@ -1,3 +1,4 @@
+from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.utils import add_root_of_trust
 from ..common import *
 import pdb;
@@ -14,19 +15,40 @@ import pytest
 from verifier.core import verifying, basing
 from verifier.core.authorizing import Authorizer, Schema, DEFAULT_EBA_ROLE
 
-# @pytest.fixture(autouse=True)
-# def setup():
-#     # Your setup code goes here
-#     print("Setting up")
+
+@pytest.fixture(autouse=True)
+def setup():
+    allowed_schemas = [
+        getattr(Schema, x) for x in ("ECR_SCHEMA", "ECR_SCHEMA_PROD", "TEST_SCHEMA")
+    ]
+    allowed_ecr_roles = [
+        "EBA Data Submitter",
+        "EBA Data Admin"
+    ]
+    allowed_oor_roles = []
+    verifier_mode = os.environ.get("VERIFIER_ENV", "production")
+    trusted_leis = []
+    verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
+
+    ve_init_params = {
+        "mode": verifier_mode,
+        "trustedLeis": trusted_leis if trusted_leis else [],
+        "verifyRootOfTrust": verify_rot,
+        "authAllowedSchemas": allowed_schemas,
+        "authAllowedEcrRoles": allowed_ecr_roles,
+        "authAllowedOorRoles": allowed_oor_roles
+    }
+
+    VerifierEnvironment.initialize(**ve_init_params)
 
 
 def test_setup_verifying(seeder):
     with habbing.openHab(name="verifier1", salt=b"0123456789abcdefg", temp=True) as (
-        hby,
-        hab,
+            hby,
+            hab,
     ), habbing.openHab(name="holder1", salt=b"123456789abcdef01", temp=True) as (
-        holdhby,
-        holdhab,
+            holdhby,
+            holdhab,
     ):
         seeder.seedSchema(db=holdhby.db)
         seeder.seedSchema(db=hby.db)
@@ -158,7 +180,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -192,7 +214,7 @@ def test_ecr(seeder):
         )
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger)
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -206,8 +228,8 @@ def test_ecr(seeder):
         raw = data.encode("utf-8")
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert (
-            cig.qb64
-            == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
+                cig.qb64
+                == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
         result = client.simulate_post(
@@ -219,8 +241,8 @@ def test_ecr(seeder):
         raw = data.encode("utf-8")
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert (
-            cig.qb64
-            == "0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP"
+                cig.qb64
+                == "0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP"
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
 
@@ -238,7 +260,7 @@ def test_ecr(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -332,7 +354,7 @@ def test_ecr_missing(seeder):
 
         hby.kevers[hab.pre] = hab.kever
 
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -346,8 +368,8 @@ def test_ecr_missing(seeder):
         raw = data.encode("utf-8")
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert (
-            cig.qb64
-            == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
+                cig.qb64
+                == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
 
@@ -383,10 +405,6 @@ def test_add_root_of_trust(seeder):
                 headers={"Content-Type": "application/json+cesr"},
             )
             assert result.status == falcon.HTTP_202
-
-
-
-
 
 
 def test_ecr_newschema(seeder):
@@ -454,7 +472,7 @@ def test_ecr_newschema(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         auth.processPresentations()
         # ecr auth cred is not authorized
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -479,7 +497,6 @@ def test_ecr_newschema(seeder):
             hby, hab, regery, registry, verifier, Schema.TEST_SCHEMA, ecr, seqner
         )
 
-
         issAndCred = bytearray()
         issAndCred.extend(ecmsgs)
         acdc = issAndCred.decode("utf-8")
@@ -492,7 +509,7 @@ def test_ecr_newschema(seeder):
         )
         assert result.status == falcon.HTTP_202
         hby.kevers[hab.pre] = hab.kever
-        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger, [LEI1], {DEFAULT_EBA_ROLE})
+        auth = Authorizer(hby, vdb, eccrdntler.rgy.reger)
         auth.processPresentations()
 
         result = client.simulate_get(f"/authorizations/{hab.pre}")
@@ -506,8 +523,8 @@ def test_ecr_newschema(seeder):
         raw = data.encode("utf-8")
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert (
-            cig.qb64
-            == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
+                cig.qb64
+                == "0BChOKVR4b5t6-cXKa3u3hpl60X1HKlSw4z1Rjjh1Q56K1WxYX9SMPqjn-rhC4VYhUcIebs3yqFv_uu0Ou2JslQL"
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
         result = client.simulate_post(
@@ -519,8 +536,8 @@ def test_ecr_newschema(seeder):
         raw = data.encode("utf-8")
         cig = hab.sign(ser=raw, indexed=False)[0]
         assert (
-            cig.qb64
-            == "0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP"
+                cig.qb64
+                == "0BB1Z2DS3QvIBdZJ1Q7yuZCUG-6YkVXDm7dcGbIFEIsLYEBfFXk8P_Y9FUACTlv5vCHeCet70QzVdR8fu5tLBKkP"
         )
         assert hby.kevers[hab.pre].verfers[0].verify(sig=cig.raw, ser=raw)
 

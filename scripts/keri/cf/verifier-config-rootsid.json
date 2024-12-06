@@ -1,18 +1,25 @@
 {
   "dt": "2022-01-20T12:57:59.823350+00:00",
   "iurls": [
-    "https://witness-dev01.rootsid.cloud/oobi/BHI7yViNOGWd1X0aKMgxLm4dUgbQDYoCFSJM2U8Hb3cx/controller", 
+    "https://witness-dev01.rootsid.cloud/oobi/BHI7yViNOGWd1X0aKMgxLm4dUgbQDYoCFSJM2U8Hb3cx/controller",
     "https://witness-dev02.rootsid.cloud/oobi/BOUZ4v-vPMP5KyZQP-d_8B30UHI4KWgXczBgWcRJnnYd/controller",
     "https://witness-dev03.rootsid.cloud/oobi/BNY3LWk2BzX8wXmkXuvpYRVSdfynanwKQwD80KOG00VH/controller"
   ],
   "durls": [
     "http://schemas.rootsid.cloud/oobi/EBNaNu-M9P5cgrnfl2Fvymy4E_jvxxyjb70PRtiANlJy",
-    "http://schemas.rootsid.cloud/oobi/EMhvwOlyEJ9kN4PrwCpr9Jsv7TxPhiYveZ0oP3lJzdEi", 
-    "http://schemas.rootsid.cloud/oobi/EKA57bKBKxr_kN7iN5i7lMUxpMG-s19dRcmov1iDxz-E", 
+    "http://schemas.rootsid.cloud/oobi/EMhvwOlyEJ9kN4PrwCpr9Jsv7TxPhiYveZ0oP3lJzdEi",
+    "http://schemas.rootsid.cloud/oobi/EKA57bKBKxr_kN7iN5i7lMUxpMG-s19dRcmov1iDxz-E",
     "http://schemas.rootsid.cloud/oobi/EEy9PkikFcANV1l7EHukCeXqrzT1hNZjGlUk7wuMO5jw",
     "http://schemas.rootsid.cloud/oobi/ENPXp1vQzRF6JwIuS-mp2U8Uf1MoADoP_GqQ62VsDZWY",
     "http://schemas.rootsid.cloud/oobi/EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g",
     "http://schemas.rootsid.cloud/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
   ],
-  "LEIs": []
+  "trustedLeis": [],
+  "allowedEcrRoles": [
+    "EBA Data Submitter"
+  ],
+  "allowedSchemas": [
+    "ECR_SCHEMA",
+    "ECR_SCHEMA_PROD"
+  ]
 }

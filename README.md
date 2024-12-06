@@ -52,7 +52,50 @@ The default root of trust is the GLEIF external(https://github.com/WebOfTrust/We
 If you are running Keria locally, you will need to add your own Root Of Trust. To do that you need to set the env variable 'VERIFIER_ENV=development'. And then 
 send the POST request to the localhost:7676/root_of_trust/{AID-of-the-root-of-trust} with application/json+cesr format data containing the CESR of the new  Root Of Trust.
 
-## Peer projects
+# Configuration:
+## Running the Verifier Service
+
+To run the Verifier service, you need to specify a configuration file by providing the following arguments:  
+`--config-dir=scripts --config-file='your_config_file'`
+
+---
+
+## Configuration Files Location
+
+Configuration files are located in the following directory:  
+`scripts/keri/cf`
+
+---
+
+## Configurable Parameters
+
+You can customize the service behavior using these configuration options:  
+
+- **`iurls`**: - OOBI URLs
+- **`durls`**: - Schema OOBI URLs
+- **`trustedLeis`**: A list of trusted LE identifiers.  
+- **`allowedEcrRoles`**: Roles permitted for ECR credential authorization.  
+- **`allowedOorRoles`**: Roles permitted for OOR credential authorization.  
+- **`allowedSchemas`**: A list of schemas allowed for authorization.
+
+---
+
+## Example
+
+```bash
+python verifier.py --config-dir=scripts --config-file='verifier-config-public.json'
+```
+
+## Verifier Endpoints:
+
+### POST /presentations/{said}
+    This endpoint performs cryptographic verification of the Credential(provided in a CESR format in request body).
+### GET /authorizations/{aid}
+    Using the AID from the request responds with the actual authorization status for the AID.
+### GET /request/verify
+    This endpoint performs Signed Headers verification
+
+# Peer projects
 ### Webapp
 The web app (UI front-end) uses Signify/KERIA for selecting identifiers and credentials:
 
