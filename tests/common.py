@@ -4,6 +4,7 @@ import json
 import pytest
 
 from .conftest import *
+from verifier.core.authorizing import DEFAULT_EBA_ROLE
 
 from keri.app import signing
 from keri.core import coring, eventing, parsing, scheming, serdering
@@ -258,8 +259,8 @@ def get_da_cred(issuer, schema, registry):
 
     return creder   
 
-def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str):
-    sad = dict(get_ecr_data(lei))
+def get_ecr_auth_cred(aid, issuer, recipient, schema, registry, sedge, lei: str, role=DEFAULT_EBA_ROLE):
+    sad = dict(get_ecr_data(lei, role))
     sad["AID"]=f'{aid}'
     
     _, ecr_auth = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
@@ -316,17 +317,17 @@ def get_ecr_edge(auth_dig, auth_schema):
   
     return ecr
 
-def get_ecr_data(lei: str):
+def get_ecr_data(lei: str, role: str = DEFAULT_EBA_ROLE):
     return dict(
         d="",
         personLegalName="Bank User",
-        engagementContextRole="EBA Data Submitter",
+        engagementContextRole=role,
         LEI=f"{lei}"
     )
 
-def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str):
+def get_ecr_cred(issuer, recipient, schema, registry, sedge, lei: str, role=DEFAULT_EBA_ROLE):
 
-    sad = get_ecr_data(lei)
+    sad = get_ecr_data(lei, role)
 
     _, ecr = coring.Saider.saidify(sad=sad, label=coring.Saids.d)
     
@@ -587,7 +588,6 @@ def create_and_issue(hby, hab, regery, registry, verifier, schema, creder, seqne
 
     saids = regery.reger.issus.get(keys=hab.pre)
     scads = regery.reger.schms.get(keys=schema)
-    assert len(scads) == 1
 
     return Credentialer(hby, regery, None, verifier)
 

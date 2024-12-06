@@ -6,14 +6,16 @@ from keri.app import configing
 
 from verifier.core.constants import Schema, EBA_DATA_ADMIN_ROLE, EBA_DATA_SUBMITTER_ROLE
 
+
 @dataclass(frozen=True)
 class VerifierEnvironment:
     configuration: configing.Configer = None
     trustedLeis: List[str] = field(default_factory=list)
     mode: str = "production"
     verifyRootOfTrust: bool = False
-    authAllowedSchemas: Tuple = (Schema.ECR_SCHEMA, Schema.ECR_SCHEMA_PROD)
-    authAllowedRoles: Tuple = (EBA_DATA_SUBMITTER_ROLE, EBA_DATA_ADMIN_ROLE)
+    authAllowedSchemas: List = field(default_factory=lambda: [Schema.ECR_SCHEMA, Schema.ECR_SCHEMA_PROD])
+    authAllowedEcrRoles: List = field(default_factory=lambda: [EBA_DATA_ADMIN_ROLE, EBA_DATA_SUBMITTER_ROLE])
+    authAllowedOorRoles: List = field(default_factory=lambda: [])
 
     _instance: "VerifierEnvironment" = None
 
@@ -48,5 +50,3 @@ class VerifierEnvironment:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-
-

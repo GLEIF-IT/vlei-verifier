@@ -18,8 +18,12 @@
   "allowedEcrRoles": [
     "EBA Data Submitter"
   ],
+  "allowedOorRoles": [
+    "HR Manager"
+  ],
   "allowedSchemas": [
     "ECR_SCHEMA",
-    "ECR_SCHEMA_PROD"
+    "ECR_SCHEMA_PROD",
+    "OOR_SCHEMA"
   ]
 }
