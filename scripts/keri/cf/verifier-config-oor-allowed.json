@@ -14,7 +14,9 @@
     "http://127.0.0.1:7723/oobi/EH6ekLjSr8V32WyFbGe1zXjTzFs9PkTYmupJ9H65O14g",
     "http://127.0.0.1:7723/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
   ],
-  "trustedLeis": [],
+  "trustedLeis": [
+
+  ],
   "allowedEcrRoles": [
     "EBA Data Submitter"
   ],

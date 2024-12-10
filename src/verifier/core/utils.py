@@ -2,8 +2,8 @@ import json
 
 from keri import kering
 from keri.core import MtrDex, coring, parsing
-from keri.vdr.eventing import state
-
+import keri.help.helping as help
+from keri.db import basing
 from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust
 
 
@@ -56,6 +56,14 @@ def add_root_of_trust(ims, hby, tvy, vry, vdb, aid):
         vdb.root.pin(keys=(aid,), val=root_of_trust)
         return True
     else:
+        return False
+
+def add_oobi(hby, oobi):
+    try:
+        obr = basing.OobiRecord(date=help.toIso8601())
+        hby.db.oobis.pin(keys=(oobi,), val=obr)
+        return True
+    except Exception as e:
         return False
 
 

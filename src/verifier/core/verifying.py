@@ -10,7 +10,7 @@ from verifier.core.basing import (
     CredProcessState,
     cred_age_off, AUTH_REVOKED,
 )
-from verifier.core.utils import process_revocations, add_root_of_trust
+from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -53,6 +53,8 @@ def loadEnds(app, hby, vdb, tvy, vry):
     app.add_route("/presentations/{said}", credEnd)
     rotEnd = RootOfTrustResourceEndpoint(hby, vdb, tvy, vry)
     app.add_route("/root_of_trust/{aid}", rotEnd)
+    oobiEnd = OobiResourceEndpoint(hby)
+    app.add_route("/oobi", oobiEnd)
     authEnd = AuthorizationResourceEnd(hby, vdb)
     app.add_route("/authorizations/{aid}", authEnd)
     verEnd = RequestVerifierResourceEnd(hby=hby, vdb=vdb)
@@ -62,15 +64,14 @@ def loadEnds(app, hby, vdb, tvy, vry):
 
 
 class RootOfTrustResourceEndpoint:
-    """Credential presentation resource endpoint class
+    """Root Of Trust resource endpoint class
 
-    This class allows for a PUT to a credential SAID specific endpoint to trigger credential presentation
-    verification.
+    This class allows to add new Root Of Trust.
 
     """
 
     def __init__(self, hby, vdb, tvy, vry):
-        """Create credential presentation resource endpoint instance
+        """Create Root Of Trust resource endpoint instance
 
         Parameters:
             hby (Habery): Database environment for exposed KERI AIDs
@@ -85,7 +86,7 @@ class RootOfTrustResourceEndpoint:
         self.vry = vry
 
     def on_post(self, req, rep, aid):
-        """Credential Presentation Resource PUT Method
+        """Root Of Trust Resource PUT Method
 
         Parameters:
             req: falcon.Request HTTP request
@@ -93,16 +94,16 @@ class RootOfTrustResourceEndpoint:
             aid: AID of credential being presented
 
         ---
-         summary: Present vLEI ECR credential for AID authorization to other endpoints
-         description: Present vLEI ECR credential for AID authorization to other endpoints
+         summary: Add new Root Of Trust
+         description: Add new Root Of Trust
          tags:
-            - Credentials
+            - Root Of Trust
          parameters:
            - in: path
              name: aid
              schema:
                 type: string
-             description: qb64 SAID of credential being presented
+             description: AID of the new Root Of Trust
          requestBody:
              required: true
              content:
@@ -140,6 +141,64 @@ class RootOfTrustResourceEndpoint:
             rep.data = json.dumps(
                 dict(
                     msg=f"Adding new Root Of Trust with AID: {aid} FAILED",
+                )
+            ).encode("utf-8")
+
+
+class OobiResourceEndpoint:
+    """OOBI presentation resource endpoint class
+
+    This class allows for to add new OOBI.
+
+    """
+
+    def __init__(self, hby):
+        """Create OOBI presentation resource endpoint instance
+
+        Parameters:
+            hby (Habery): Database environment for exposed KERI AIDs
+        """
+        self.hby = hby
+
+    def on_post(self, req, rep):
+        """Oobi Presentation Resource PUT Method
+
+        Parameters:
+            req: falcon.Request HTTP request
+            rep: falcon.Response HTTP response
+        ---
+         summary: Add new OOBI
+         description: Add new OOBI
+         tags:
+            - Oobi
+         requestBody:
+             required: true
+             content:
+                application/json:
+                  schema:
+                    type: application/json
+                    format: json
+         responses:
+           202:
+              description: New OOBI added
+
+        """
+        rep.content_type = "application/json"
+        oobi_info = req.media
+        result = add_oobi(self.hby, oobi_info.get("oobi"))
+
+        if result:
+            rep.status = falcon.HTTP_ACCEPTED
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Successfully added new OOBI with url: {oobi_info.get("oobi")}",
+                )
+            ).encode("utf-8")
+        else:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(
+                dict(
+                    msg=f"Adding new OOBI with url: {oobi_info.get("oobi")} FAILED",
                 )
             ).encode("utf-8")
 
