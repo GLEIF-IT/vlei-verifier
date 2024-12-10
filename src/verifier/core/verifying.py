@@ -94,8 +94,8 @@ class RootOfTrustResourceEndpoint:
             aid: AID of credential being presented
 
         ---
-         summary: Add new Root Of Truest
-         description: Add new Root Of Truest
+         summary: Add new Root Of Trust
+         description: Add new Root Of Trust
          tags:
             - Root Of Trust
          parameters:
