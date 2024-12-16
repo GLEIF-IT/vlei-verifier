@@ -397,12 +397,15 @@ def test_add_root_of_trust(seeder):
             json_oobi_gleif = json.loads(f.read())
             aid = json_oobi_gleif.get("aid")
             vlei = json_oobi_gleif.get("vlei")
-
+            oobi = json_oobi_gleif.get("oobi")
             client = falcon.testing.TestClient(app)
             result = client.simulate_post(
                 f"/root_of_trust/{aid}",
-                body=vlei,
-                headers={"Content-Type": "application/json+cesr"},
+                json={
+                    "vlei": vlei,
+                    "oobi": oobi
+                },
+                headers={"Content-Type": "application/json"},
             )
             assert result.status == falcon.HTTP_202
 

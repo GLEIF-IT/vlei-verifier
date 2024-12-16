@@ -46,7 +46,8 @@ parser.add_argument('--config-file',
                     default="dkr",
                     help="configuration filename override")
 
-dev_only_endpoints = [r"/root_of_trust/.*"]
+#
+dev_only_endpoints = list(filter(None, os.environ.get('DEV_ONLY_ENDPOINTS', "").split(",")))
 
 
 class EnvironmentMiddleware:

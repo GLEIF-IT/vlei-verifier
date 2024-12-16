@@ -42,7 +42,7 @@ def process_revocations(vdb, creds, said):
                 vdb.iss.pin(keys=(said,), val=rev_state)
 
 
-def add_root_of_trust(ims, hby, tvy, vry, vdb, aid):
+def add_root_of_trust(ims, hby, tvy, vry, vdb, aid, oobi):
     parsing.Parser().parse(ims=ims, kvy=hby.kvy, tvy=tvy, vry=vry)
     found = False
     while hby.kvy.cues:
@@ -51,6 +51,8 @@ def add_root_of_trust(ims, hby, tvy, vry, vdb, aid):
             serder = msg["serder"]
             if serder.sad.get("i") == aid:
                 found = True
+    if oobi:
+        add_oobi(hby, oobi)
     if found:
         root_of_trust = RootOfTrust(aid=aid)
         vdb.root.pin(keys=(aid,), val=root_of_trust)
