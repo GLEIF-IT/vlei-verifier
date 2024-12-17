@@ -179,6 +179,16 @@ class Filer:
             yield bytes(chunk)
             idx += 1
 
+
+    def clearData(self, dig):
+        idx = 0
+        while True:
+            key = f"{dig}.{idx}".encode("utf-8")
+            chunk = self.vdb.delIoVals(db=self.vdb.imgs, key=key)
+            if not chunk:
+                break
+            idx += 1
+
     def getAccepted(self):
         """ Generator that yields SAID values for all reports currently in Accepted status
 
@@ -479,7 +489,8 @@ class ReportVerifier(doing.Doer):
                 msg = e.args[0]
                 changes.append((said, ReportStatus.failed, msg))
                 logger.info(f"Added failed status message {msg}")
-                
+            finally:
+                self.filer.clearData(said)
         for said, status, msg in changes:
             self.filer.update(said, ReportStatus.accepted, status, msg)
             logger.info(f"Changed {said} {status} status message {msg}")
