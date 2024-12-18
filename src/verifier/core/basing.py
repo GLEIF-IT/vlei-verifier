@@ -5,6 +5,7 @@ verifier.core.basing module
 
 Database support
 """
+import os
 from collections import namedtuple
 from dataclasses import dataclass, asdict, field
 from typing import List
@@ -129,6 +130,7 @@ class VerifierBaser(dbing.LMDBer):
     TailDirPath = "keri/vdb"
     AltTailDirPath = ".verifier/vdb"
     TempPrefix = "keri_vdb_"
+    KERIBaserMapSizeKey = "KERI_BASER_MAP_SIZE"
 
     def __init__(self, name="vdb", headDirPath=None, reopen=True, **kwa):
         """  Create verifier database
@@ -155,6 +157,13 @@ class VerifierBaser(dbing.LMDBer):
 
         # Komer instance of ReportStats data class, keyed by SAID
         self.stats = None
+
+        if (mapSize := os.getenv(self.KERIBaserMapSizeKey)) is not None:
+            try:
+                self.MapSize = int(mapSize)
+            except ValueError:
+                print("KERI_BASER_MAP_SIZE must be an integer value >1!")
+                raise
 
         super(VerifierBaser, self).__init__(name=name, headDirPath=headDirPath, reopen=reopen, **kwa)
 

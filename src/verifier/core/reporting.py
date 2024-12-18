@@ -106,7 +106,7 @@ class Filer:
         diger = DigerBuilder.sha256(dig)
         report = b''
         while True:
-            chunk = stream.read(4096)
+            chunk = stream.read(4194304)
             report += chunk
             if not chunk:
                 break
@@ -137,16 +137,19 @@ class Filer:
 
                             tmp_diger = DigerBuilder.sha256(dig)
                             if not tmp_diger.verify(file_object):
+                                self.clearData(diger)
                                 raise kering.ValidationError(f"Invalid digest for file {fullPath}")
                             logger.info(f"File {fullPath} w/ digest {dig} has valid digest")
                         except KeyError as e:
+                            self.clearData(diger)
                             raise kering.ValidationError(f"Invalid digest, manifest digest missing '{e.args[0]}'")
                         except OSError:
+                            self.clearData(diger)
                             raise kering.ValidationError(f"signature element={signature} point to invalid file")
                         except Exception as e:
-                            raise kering.ValidationError(f"{e}")
-                        finally:
                             self.clearData(diger)
+                            raise kering.ValidationError(f"{e}")
+
         except Exception as e:
             self.clearData(diger)
             raise e
@@ -186,13 +189,7 @@ class Filer:
 
 
     def clearData(self, dig):
-        idx = 0
-        while True:
-            key = f"{dig}.{idx}".encode("utf-8")
-            chunk = self.vdb.delVal(db=self.vdb.imgs, key=key)
-            if not chunk:
-                break
-            idx += 1
+        self.vdb.delTopVal(db=self.vdb.imgs, key=dig.encode("utf-8"))
 
     def getAccepted(self):
         """ Generator that yields SAID values for all reports currently in Accepted status
