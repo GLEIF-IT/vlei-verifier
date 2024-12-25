@@ -32,7 +32,8 @@ def setup(app, hby, vdb, reger, local=False):
         json_oobi_gleif = json.loads(f.read())
         aid = json_oobi_gleif.get("aid")
         vlei = bytes(json_oobi_gleif.get("vlei"), "utf8")
-        add_root_of_trust(vlei, hby, tvy, vry, vdb, aid)
+        oobi = json_oobi_gleif.get("oobi")
+        add_root_of_trust(vlei, hby, tvy, vry, vdb, aid, oobi)
 
 
 def loadEnds(app, hby, vdb, tvy, vry):
@@ -118,16 +119,18 @@ class RootOfTrustResourceEndpoint:
         """
         rep.content_type = "application/json"
 
-        if req.content_type not in ("application/json+cesr",):
+        if req.content_type not in ("application/json",):
             rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(
                 dict(msg=f"invalid content type={req.content_type} for Root Of Trust presentation")
             ).encode("utf-8")
             return
 
-        ims = req.bounded_stream.read()
+        req_media = req.media
+        ims = bytes(req_media.get("vlei"), "utf-8")
+        oobi = req_media.get("oobi")
 
-        result = add_root_of_trust(ims, self.hby, self.tvy, self.vry, self.vdb, aid)
+        result = add_root_of_trust(ims, self.hby, self.tvy, self.vry, self.vdb, aid, oobi)
 
         if result:
             rep.status = falcon.HTTP_ACCEPTED
