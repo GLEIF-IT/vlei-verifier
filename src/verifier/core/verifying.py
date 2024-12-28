@@ -1,8 +1,11 @@
 import datetime
+import os
+
 import falcon
 import json
 
-from keri.core import coring, parsing
+from keri import kering
+from keri.core import coring, parsing, Siger
 from keri.vdr import verifying, eventing
 from verifier.core.basing import (
     CRED_CRYPT_INVALID,
@@ -10,7 +13,7 @@ from verifier.core.basing import (
     CredProcessState,
     cred_age_off, AUTH_REVOKED,
 )
-from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi
+from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -60,6 +63,8 @@ def loadEnds(app, hby, vdb, tvy, vry):
     app.add_route("/authorizations/{aid}", authEnd)
     verEnd = RequestVerifierResourceEnd(hby=hby, vdb=vdb)
     app.add_route("/request/verify/{aid}", verEnd)
+    sigEnd = SignatureVerifierResourceEnd(hby=hby, vdb=vdb)
+    app.add_route("/signature/verify", sigEnd)
 
     return []
 
@@ -332,7 +337,8 @@ class PresentationResourceEndpoint:
 
         # Here we don't process credentials that have been revoked(We don't update their state)
         # If the credential was revoked we shouldn't update it's state with the new one
-        if not self.vdb.iss.get(keys=(aid,)) or (self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED or self.vdb.iss.get(keys=(aid,)).said != said):
+        if not self.vdb.iss.get(keys=(aid,)) or (
+                self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED or self.vdb.iss.get(keys=(aid,)).said != said):
             print(f"{aid} account cleared after successful presentation")
             # clear any previous login, now that a valid credential has been presented
             self.vdb.accts.rem(keys=(aid,))
@@ -585,6 +591,122 @@ class RequestVerifierResourceEnd:
 
         rep.status = falcon.HTTP_ACCEPTED
         rep.data = json.dumps(dict(msg="Signature Valid")).encode("utf-8")
+        return
+
+
+class SignatureVerifierResourceEnd:
+    """Signature Verifier Resource endpoint class
+
+    This class provides a POST method endpoint that validating signatures for AIDs that have previously presented
+    a valid vLEI credential.
+
+    """
+
+    def __init__(self, hby, vdb):
+        """Create a signature verifier resource endpoint class
+
+        Parameters:
+            hby (Habery): Database environment for exposed KERI AIDs
+            vdb (VerifierBaser): Verifier database environment
+
+        """
+        self.hby = hby
+        self.vdb = vdb
+
+    def on_post(self, req, rep):
+        """Request verifier resource POST method
+
+        Parameters:
+            req: falcon.Request HTTP request
+            rep: falcon.Response HTTP response
+
+        ---
+         summary:
+         description: Verifies the signature of request values for authorized AIDs
+         tags:
+            - Authorizations
+         parameters:
+           - in: path
+             name: aid
+             schema:
+                type: string
+             description: qb64 AID of presenter
+         responses:
+           200:
+              description: AID is authorized to sign requests
+           404:
+              description: AID has never presented any credentials
+           403:
+              description: AID has presented an invalid or subsequently revoked credential
+           401:
+              description: provided signature is not valid against values of the request
+
+        """
+        rep.content_type = "application/json"
+
+        data = req.media
+        signer_aid = data.get("signer_aid")
+        signature = data.get("signature")
+        non_prefixed_digest = data.get("non_prefixed_digest")
+        if signer_aid is None:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg="request missing signer_aid parameter", code=1)).encode(
+                "utf-8"
+            )
+            return
+
+        if signature is None:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg="request missing signature parameter", code=1)).encode(
+                "utf-8"
+            )
+            return
+        try:
+            subAcct = self.vdb.accts.get(keys=(signer_aid,))
+            if subAcct is None:
+                rep.status = falcon.HTTP_UNAUTHORIZED
+                rep.data = json.dumps(
+                    dict(msg=f"submitter does not have a valid account", code=1)).encode(
+                    "utf-8")
+                return
+
+            # Now ensure we know who this AID is and that we have their key state
+            if signer_aid not in self.hby.kevers:
+                rep.status = falcon.HTTP_UNAUTHORIZED
+                rep.data = json.dumps(
+                    dict(msg=f"signature from unknown AID {signer_aid}", code=1)).encode(
+                    "utf-8")
+                return
+
+            kever = self.hby.kevers[signer_aid]
+            siger = Siger(qb64=signature)
+            siger.verfer = kever.verfers[siger.index]  # assign verfer
+            if not siger.verfer.verify(siger.raw, bytes(non_prefixed_digest, "utf-8")):  # verify each sig
+                rep.status = falcon.HTTP_UNAUTHORIZED
+                rep.data = json.dumps(
+                    dict(msg=f"signature {siger.index} invalid or wasn't signed by {signer_aid}",
+                         code=1)).encode("utf-8")
+                return
+
+
+        except KeyError as e:
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"Invalid signature in manifest missing '{e.args[0]}'", code=1)).encode(
+                "utf-8")
+            return
+        except OSError:
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"signature element={signature} points to invalid file", code=1)).encode(
+                "utf-8")
+            return
+
+        except Exception as e:
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"{e}", code=1)).encode("utf-8")
+            return
+
+        rep.status = falcon.HTTP_ACCEPTED
+        rep.data = json.dumps(dict(msg="Signature Valid", code=3)).encode("utf-8")
         return
 
 
