@@ -22,6 +22,7 @@ class CredProcessState:
     said: Optional[str] = None
     state: Optional[str] = None
     info: Optional[str] = None
+    role: Optional[str] = None
     date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
     
     def __iter__(self):
@@ -31,6 +32,10 @@ CRED_CRYPT_INVALID = "Credential cryptographically invalid"
 CRED_CRYPT_VALID = "Credential cryptographically valid"
 CRED_AGE_OFF = "Credential presentation has aged off"
 AUTH_REVOKED = "Credential revoked"
+AUTH_PENDING = "Credential pending authorization"
+AUTH_SUCCESS = "Credential authorized"
+AUTH_FAIL = "Credential unauthorized"
+AUTH_EXPIRE = "Credential authorization expired"
 
 def cred_age_off(state: CredProcessState, timeout: float):
     # cancel presentations that have been around longer than timeout
