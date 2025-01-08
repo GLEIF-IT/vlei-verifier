@@ -15,18 +15,13 @@ from keri import kering
 from keri.core import coring
 from keri.help import helping
 
-from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED
+from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED, AUTH_PENDING, AUTH_SUCCESS, AUTH_EXPIRE, \
+    AUTH_FAIL, CRED_CRYPT_VALID
 from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
 from verifier.core.resolve_env import VerifierEnvironment
-from verifier.core.verifying import CRED_CRYPT_VALID
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
 DEFAULT_EBA_ROLE = "EBA Data Submitter"
-
-AUTH_PENDING = "Credential pending authorization"
-AUTH_SUCCESS = "Credential authorized"
-AUTH_FAIL = "Credential unauthorized"
-AUTH_EXPIRE = "Credential authorization expired"
 
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
@@ -139,7 +134,9 @@ class Authorizer:
                 # are there multiple creds for the same said?
                 passed_cred_filters, info = self.cred_filters(creder)
                 if passed_cred_filters:
-                    cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS, info=info)
+                    cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS, info=info,
+                                                  role=creder.attrib["engagementContextRole"] or creder.attrib[
+                                                      "officialRole"])
                     acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
                     self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
                 else:

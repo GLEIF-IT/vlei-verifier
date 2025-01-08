@@ -7,11 +7,18 @@ import json
 from keri import kering
 from keri.core import coring, parsing, Siger
 from keri.vdr import verifying, eventing
+
+from verifier.core.authorizing import AUTH_EXPIRE
 from verifier.core.basing import (
     CRED_CRYPT_INVALID,
     CRED_CRYPT_VALID,
     CredProcessState,
-    cred_age_off, AUTH_REVOKED,
+    cred_age_off,
+    AUTH_REVOKED,
+    AUTH_PENDING,
+    AUTH_SUCCESS,
+    AUTH_EXPIRE,
+    AUTH_FAIL
 )
 from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder
 
@@ -451,12 +458,12 @@ class AuthorizationResourceEnd:
         """
         rep.content_type = "application/json"
         acct = self.vdb.accts.get(keys=(aid,))
+        state: CredProcessState = self.vdb.iss.get(keys=(aid,))
         if aid not in self.hby.kevers:
             rep.status = falcon.HTTP_UNAUTHORIZED
             rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
-        elif acct is None:
+        elif acct is None or state is None or state.state == AUTH_EXPIRE:
             rep.status = falcon.HTTP_UNAUTHORIZED
-            state: CredProcessState = self.vdb.iss.get(keys=(aid,))
             if state is None:
                 rep.data = json.dumps(
                     dict(
@@ -470,10 +477,12 @@ class AuthorizationResourceEnd:
                     )
                 ).encode("utf-8")
         else:
+            state: CredProcessState = self.vdb.iss.get(keys=(aid,))
             body = dict(
                 aid=aid,
                 said=acct.said,
                 lei=acct.lei,
+                role=state.role,
                 msg=f"AID {aid} w/ lei {acct.lei} has valid login account",
             )
 
@@ -632,12 +641,10 @@ class SignatureVerifierResourceEnd:
                 type: string
              description: qb64 AID of presenter
          responses:
-           200:
-              description: AID is authorized to sign requests
+           202:
+              description: Signature valid
            404:
-              description: AID has never presented any credentials
-           403:
-              description: AID has presented an invalid or subsequently revoked credential
+              description: Bad request
            401:
               description: provided signature is not valid against values of the request
 

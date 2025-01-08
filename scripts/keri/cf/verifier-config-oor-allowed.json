@@ -18,7 +18,8 @@
 
   ],
   "allowedEcrRoles": [
-    "EBA Data Submitter"
+    "EBA Data Submitter",
+    "EBA Data Admin"
   ],
   "allowedOorRoles": [
     "HR Manager"
