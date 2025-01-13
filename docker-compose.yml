@@ -36,6 +36,8 @@ services:
     #   - witnesses
     ports:
       - 7676:7676
+    environment:
+      - VERIFIER_CONFIG_FILE=verifier-config-public.json
     healthcheck:
       test:
           - CMD

@@ -253,7 +253,13 @@ class Authorizer:
                 if creder.edge:
                     chain_success, chain_msg = (False, f"Unexpected {cred_type} cred edge {creder.edge}")
                 else:
-                    if self.env.verifyRootOfTrust:
+                    issuee_aid = creder.attrib["i"]
+                    issuee_kever = self.hby.kvy.kevers[issuee_aid]
+                    if not issuee_kever.delegated:
+                        chain_success, chain_msg = (False, "The QVI AID must be delegated")
+                    elif self.vdb.root.get(keys=(issuee_kever.delpre,)) is None:
+                        chain_success, chain_msg = (False, "The QVI AID must be delegated from the Root Of Trust")
+                    elif self.env.verifyRootOfTrust:
                         issuer_aid = creder.sad.get("i")
                         if self.vdb.root.get(keys=(issuer_aid,)):
                             chain_success, chain_msg = (True, "QVI")

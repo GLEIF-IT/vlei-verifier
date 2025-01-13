@@ -116,10 +116,10 @@ def test_setup_verifying(seeder):
 
 def test_ecr(seeder):
     app = falcon.App()
-
-    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
+    gleif_external_aid = "EA8N0zrLXPafG3UUZg8K6BhkU8V4nRju9BQeilL3Z4gh"
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef", delpre=gleif_external_aid) as (hby, hab):
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-
+        add_root_of_trust_test_request(hby, vdb)
         #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(
@@ -268,7 +268,8 @@ def test_ecr(seeder):
 
 
 def test_ecr_missing(seeder):
-    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
+    gleif_external_aid = "EA8N0zrLXPafG3UUZg8K6BhkU8V4nRju9BQeilL3Z4gh"
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef", delpre=gleif_external_aid) as (hby, hab):
         #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(
@@ -324,6 +325,7 @@ def test_ecr_missing(seeder):
 
         app = falcon.App()
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
+        add_root_of_trust_test_request(hby, vdb)
         verifying.setup(app=app, hby=hby, vdb=vdb, reger=eacrdntler.rgy.reger)
 
         issAndCred = bytearray()
@@ -412,9 +414,10 @@ def test_add_root_of_trust(seeder):
 
 def test_ecr_newschema(seeder):
     app = falcon.App()
-    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
+    gleif_external_aid = "EA8N0zrLXPafG3UUZg8K6BhkU8V4nRju9BQeilL3Z4gh"
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef", delpre=gleif_external_aid) as (hby, hab):
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-
+        add_root_of_trust_test_request(hby, vdb)
         #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(

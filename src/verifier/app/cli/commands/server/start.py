@@ -102,7 +102,7 @@ def launch(args):
     allowed_oor_roles = config.get("allowedOorRoles", [])
     verifier_mode = os.environ.get("VERIFIER_ENV", "production")
     trusted_leis = config.get("trustedLeis", [])
-    verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
+    verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
 
     ve_init_params = {
         "configuration": cf,

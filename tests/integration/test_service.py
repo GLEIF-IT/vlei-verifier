@@ -44,8 +44,9 @@ def setup():
     VerifierEnvironment.initialize(**ve_init_params)
 
 
-def test_service_ecr(seeder):        
-    with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef') as (hby, hab):
+def test_service_ecr(seeder):
+    gleif_external_aid = "EA8N0zrLXPafG3UUZg8K6BhkU8V4nRju9BQeilL3Z4gh"
+    with habbing.openHab(name="sid", temp=True, salt=b'0123456789abcdef', delpre=gleif_external_aid) as (hby, hab):
 
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(hby, hab, registryName="qvireg")
@@ -75,6 +76,7 @@ def test_service_ecr(seeder):
                 allow_credentials='*',
                 expose_headers=['cesr-attachment', 'cesr-date', 'content-type']))
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
+        add_root_of_trust_test_request(hby, vdb)
         verifying.setup(app=app, hby=hby, vdb=vdb, reger=eccrdntler.rgy.reger)
         server = http.Server(port=port, app=app)
         httpServerDoer = http.ServerDoer(server=server)
@@ -181,7 +183,7 @@ def test_service_ecr(seeder):
 #         # class testCf:
 #         #     def get():
 #         #         return dict(LEIs=[f"{LEI1}",f"{LEI2}"])
-#         rootsCf = configing.Configer(name="verifier-config-public.json",
+#         rootsCf = configing.Configer(name="verifier-config-public-eba.json",
 #                             headDirPath="/home/aidar/Desktop/git/gleif/vlei-verifier/scripts",
 #                             base="",
 #                             temp=False, reopen=True, clear=False)

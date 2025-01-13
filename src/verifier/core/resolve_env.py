@@ -12,9 +12,9 @@ class VerifierEnvironment:
     configuration: configing.Configer = None
     trustedLeis: List[str] = field(default_factory=list)
     mode: str = "production"
-    verifyRootOfTrust: bool = False
-    authAllowedSchemas: List = field(default_factory=lambda: [Schema.ECR_SCHEMA, Schema.ECR_SCHEMA_PROD])
-    authAllowedEcrRoles: List = field(default_factory=lambda: [EBA_DATA_ADMIN_ROLE, EBA_DATA_SUBMITTER_ROLE])
+    verifyRootOfTrust: bool = True
+    authAllowedSchemas: List = field(default_factory=lambda: [])
+    authAllowedEcrRoles: List = field(default_factory=lambda: [])
     authAllowedOorRoles: List = field(default_factory=lambda: [])
 
     _instance: "VerifierEnvironment" = None

@@ -1,4 +1,5 @@
 from verifier.core.resolve_env import VerifierEnvironment
+from verifier.core.utils import add_root_of_trust
 from ..common import *
 
 import falcon
@@ -6,11 +7,11 @@ import falcon.testing
 
 from keri.app import habbing
 from keri.core import coring
-from keri.vdr import viring
+
 
 import pytest
 
-from verifier.core import basing, verifying
+from verifier.core import basing
 from verifier.core.authorizing import Authorizer, Schema, DEFAULT_EBA_ROLE
 
 
@@ -39,11 +40,13 @@ def setup():
 
     VerifierEnvironment.initialize(**ve_init_params)
 
+
 def test_ecr(seeder):
+    gleif_external_aid = "EA8N0zrLXPafG3UUZg8K6BhkU8V4nRju9BQeilL3Z4gh"
+    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef", delpre=gleif_external_aid) as (hby, hab):
 
-    with habbing.openHab(name="sid", temp=True, salt=b"0123456789abcdef") as (hby, hab):
         vdb = basing.VerifierBaser(name=hby.name, temp=True)
-
+        add_root_of_trust_test_request(hby, vdb)
         #   habbing.openHab(name="wan", temp=True, salt=b'0123456789abcdef', transferable=False) as (wanHby, wanHab)):
         seeder.seedSchema(db=hby.db)
         regery, registry, verifier, seqner = reg_and_verf(

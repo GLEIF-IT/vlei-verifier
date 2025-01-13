@@ -31,7 +31,11 @@
   ],
   "trustedLeis": [],
   "allowedEcrRoles": [
+    "EBA Data Submitter",
+    "EBA Data Admin"
   ],
   "allowedSchemas": [
+    "ECR_SCHEMA",
+    "ECR_SCHEMA_PROD"
   ]
 }
