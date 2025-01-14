@@ -3,13 +3,14 @@
 import json
 import pytest
 
+from verifier.core.utils import add_root_of_trust
 from .conftest import *
 from verifier.core.authorizing import DEFAULT_EBA_ROLE
 
 from keri.app import signing
 from keri.core import coring, eventing, parsing, scheming, serdering
 from keri import kering
-from keri.vdr import credentialing, verifying, viring
+from keri.vdr import credentialing, verifying, viring, eventing as vdr_eventing
 from keri.vdr.credentialing import Credentialer, proving
 
 LEI1 = "254900OPPU84GM83MG36"
@@ -181,6 +182,17 @@ LEI2 = "875500ELOZEL05BVXV37"
 #         assert wse2.get("http") == "http://127.0.0.1:9999"
         
 #         yield hby, hab, wesHby, wesHab
+
+def add_root_of_trust_test_request(hby, vdb):
+    reger = viring.Reger(name=hby.name, temp=hby.temp)
+    tvy = vdr_eventing.Tevery(reger=reger, db=hby.db, local=False)
+    vry = verifying.Verifier(hby=hby, reger=reger)
+    with open("./src/root_of_trust_oobis/test_root_of_trust.json", "rb") as f:
+        json_oobi_gleif = json.loads(f.read())
+        aid = json_oobi_gleif.get("aid")
+        vlei = bytes(json_oobi_gleif.get("vlei"), "utf8")
+        oobi = json_oobi_gleif.get("oobi")
+        add_root_of_trust(vlei, hby, tvy, vry, vdb, aid, oobi)
 
 def get_cred(hby, hab, regery, registry, verifier, schema, creder, seqner):
 

@@ -27,7 +27,7 @@
 ### Example Command
 To run the Verifier service, specify the configuration file as follows:
 ```bash
-verifier server start --config-dir scripts --config-file verifier-config-rootsid.json
+verifier server start --config-dir scripts --config-file verifier-config-public.json
 ```
 
 ### Summary
