@@ -80,7 +80,7 @@ The Verifier uses configuration files to define trusted LEIs, allowed roles and 
 
 You can customize the service behavior using these configuration options:
 
-- **`iurls`**: - Witnesses OOBI URLs
+- **`iurls`**: - OOBI URLs
 - **`durls`**: - Schema OOBI URLs
 - **`trustedLeis`**: A list of trusted LE identifiers.
 - **`allowedEcrRoles`**: Roles permitted for ECR credential authorization.
@@ -88,22 +88,79 @@ You can customize the service behavior using these configuration options:
 - **`allowedSchemas`**: A list of schemas allowed for authorization.
 
 ### Default Configuration
-The default configuration file, **`verifier-config-public.json`**, is located in the **`scripts/keri/cf`** directory. By default:  
-- **`trustedLeis`**, **`allowedEcrRoles`**, and **`allowedSchemas`** are empty.  
-  - This means Schema and Role checks will fail, and any credential authorization will be rejected.  
-- You must populate **`allowedEcrRoles`** and **`allowedSchemas`** or use a pre-configured file from **`scripts/keri/cf/examples`**.  
+
+The default configuration file, **`verifier-config-public.json`**, is located in the **`scripts/keri/cf`** directory. By
+default:
+
+- **`trustedLeis`**, **`allowedEcrRoles`**, and **`allowedSchemas`** are empty.
+    - This means Schema and Role checks will fail, and any credential authorization will be rejected.
+- You must populate **`allowedEcrRoles`** and **`allowedSchemas`** or use a pre-configured file from *
+  *`scripts/keri/cf/examples`**.
 - You can also use **`verifier-config-test.json`** which has values set for the allowedEcrRoles and allowedSchemas.
 
+### Example Configurations
+
+The **`scripts/keri/cf/examples`** directory contains sample configuration files that you can use or modify as needed.
+You can also create custom configuration files based on your requirements.
+
 ### Root of Trust Configuration
-The default root of trust points to **production Gleif External**:  
+
+By default, the **Root of Trust** is set to the **Production Gleif External**:  
 `EINmHd5g7iV-UldkkkKyBIH052bIyxZNBn9pq-zNrYoS`
 
-If your credentials are not chained to this production root of trust, you must:  
+If your credentials are **not** chained to this root, follow these steps to configure your custom root of trust:
 
-Modify the file **`src/root_of_trust_oobis/gleif_external.json` to make the root of trust match the one your credentials are chained to.**
+#### Setup Instructions
 
-### Example Configurations
-The **`scripts/keri/cf/examples`** directory contains sample configuration files that you can use or modify as needed. You can also create custom configuration files based on your requirements.
+1. **Send a POST request** to:  
+   `POST /root_of_trust/{aid}`
+
+2. **Request Body Format:**  
+   ```json
+   {
+     "oobi": "{oobi}",
+     "vlei": "{vlei}"
+   }
+   ```
+   - `aid`: Your custom **Root of Trust AID**  
+   - `oobi`: Your **Root of Trust OOBI (Out-of-Band Introduction)**  
+   - `vlei`: Your **Root of Trust Credential**  
+
+#### Example (Using Production Gleif External)
+
+1. **Retrieve OOBI and VLEI:**  
+   Send a `GET` request to:  
+   ```
+   http://65.21.253.212:5623/oobi/EINmHd5g7iV-UldkkkKyBIH052bIyxZNBn9pq-zNrYoS/controller
+   ```
+
+2. **Extract the following values:**  
+   - **AID:**  
+     ```
+     EINmHd5g7iV-UldkkkKyBIH052bIyxZNBn9pq-zNrYoS
+     ```
+   - **OOBI:**  
+     ```
+     http://65.21.253.212:5623/oobi/EINmHd5g7iV-UldkkkKyBIH052bIyxZNBn9pq-zNrYoS/controller
+     ```
+   - **VLEI:**  
+     *(Response body from the GET request)*
+
+3. **Submit the POST request:**  
+   ```bash
+   curl -X POST http://your-verifier-host/root_of_trust/EINmHd5g7iV-UldkkkKyBIH052bIyxZNBn9pq-zNrYoS \
+   -H "Content-Type: application/json" \
+   -d '{
+         "oobi": "http://65.21.253.212:5623/oobi/EINmHd5g7iV-UldkkkKyBIH052bIyxZNBn9pq-zNrYoS/controller",
+         "vlei": "{VLEI_RESPONSE}"
+       }'
+   ```
+
+####  Notes
+- **Ensure** the AID, OOBI, and VLEI values are correct and trusted.  
+- Custom roots of trust must be configured before processing related credentials.
+
+
 
 
 
