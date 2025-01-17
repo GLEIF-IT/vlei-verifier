@@ -19,6 +19,9 @@ import logging
 from verifier.core import verifying, authorizing, basing, reporting
 from verifier.core.constants import Schema
 from verifier.core.resolve_env import VerifierEnvironment
+import datetime
+import json
+
 
 parser = argparse.ArgumentParser(description='Launch vLEI Verification Service')
 parser.set_defaults(handler=lambda args: launch(args),
@@ -59,6 +62,30 @@ class EnvironmentMiddleware:
                 title="Access Denied",
                 description=f"This endpoint is not accessible in the {current_env} environment."
             )
+
+class RequestResponseLoggerMiddleware:
+    def process_request(self, req, resp):
+        # Log the request details
+        timestamp = datetime.datetime.now().isoformat()
+        method = req.method
+        path = req.path
+
+        print(f"[{timestamp}] Incoming Request: {method} {path}")
+
+    def process_response(self, req, resp, resource, req_succeeded):
+        timestamp = datetime.datetime.now().isoformat()
+        method = req.method
+        path = req.path
+        status = resp.status
+        body = resp.data if resp.data else resp.text
+
+        # Convert body to a JSON string if applicable
+        body_str = body
+
+        print(f"[{timestamp}] Completed Request: {method} {path}")
+        print(f"[{timestamp}] Response Status: {status}")
+        print(f"[{timestamp}] Response Body:\n{body_str}\n")
+
 
 
 def launch(args):
@@ -137,9 +164,9 @@ def launch(args):
     )
 
     environment_middleware = EnvironmentMiddleware()
-
+    request_response_logger_middleware = RequestResponseLoggerMiddleware()
     app = falcon.App(
-        middleware=[cors_middleware, environment_middleware])
+        middleware=[cors_middleware, environment_middleware, request_response_logger_middleware])
 
     server = http.Server(port=httpPort, app=app)
     httpServerDoer = http.ServerDoer(server=server)

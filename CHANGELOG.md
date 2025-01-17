@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.0.4] - 2024-12-25
+
+### Added
+
+-   **Delegation Validation for QVI AIDs:**
+    -   The Verifier now enforces **delegation validation** for QVI AIDs.
+    -   The **QVI AID** must be **delegated by GLEIF** or **GLEIF External**, which must be set as the **Root of Trust**.
+    -   If the QVI AID is not properly delegated, the Verifier will reject the request with:
+        -   `401 Unauthorized: The QVI AID must be delegated.`
+        -   `401 Unauthorized: The QVI AID must be delegated from the Root Of Trust.` (if delegated but not from the Root of Trust)
+-   **Request and Response Logging Middleware:**
+    
+    -   Implemented middleware that logs detailed request and response information:
+        
+         -   **Request:** Logs timestamp, HTTP method, and endpoint path.
+            
+         -   **Response:** Logs timestamp, status code, and response body.
+            
+    -   This feature improves debugging and system observability.
+
+### Summary
+
+This update strengthens the security and trustworthiness of credential validation by requiring proper delegation of QVI AIDs from the Root of Trust (GLEIF or GLEIF External). Unauthorized or improperly delegated AIDs are now explicitly rejected.
+
 ## [v0.0.3] - 2024-12-18
 
 ### Added

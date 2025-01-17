@@ -1,17 +1,14 @@
-
 name: Publish Docker image
 
 on:
   push:
-    branches:
-      - "main"
-  pull_request:
-    types: [closed]
+    tags:
+      - "*"  # Triggers on any tag push
   workflow_dispatch:
     inputs:
       version:
-        required: false
-        default: 'dev'
+        description: "Docker image version (select a tag or enter manually)"
+        required: true
 jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
@@ -35,14 +32,12 @@ jobs:
       - name: Determine Docker tag
         id: docker_tag
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "closed" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
-            echo "::set-output name=tag::dev"
-          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
-            echo "::set-output name=tag::${{ github.event.inputs.version }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
           else
-            echo "::set-output name=tag::dev"
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           fi
-    
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
@@ -50,5 +45,8 @@ jobs:
           file: images/verifier.dockerfile
           push: true
           tags: |
-            gleif/vlei-verifier:${{ steps.docker_tag.outputs.tag }}
-          labels: ${{ steps.docker_tag.outputs.tag }}
+            gleif/vlei-verifier:${{ env.VERSION }}
+          labels: ${{ env.VERSION }}
+      - name: Confirm Push
+        run:
+          echo "Docker image pushed with tag:${{ env.VERSION }}"
