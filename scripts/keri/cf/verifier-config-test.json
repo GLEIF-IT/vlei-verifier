@@ -30,10 +30,6 @@
     "https://gleif-it.github.io/oobi/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
   ],
   "trustedLeis": [],
-  "allowedEcrRoles": [
-    "EBA Data Submitter",
-    "EBA Data Admin"
-  ],
   "allowedSchemas": [
     "ECR_SCHEMA",
     "ECR_SCHEMA_PROD"

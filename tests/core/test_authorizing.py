@@ -20,11 +20,6 @@ def setup():
     allowed_schemas = [
         getattr(Schema, x) for x in ("ECR_SCHEMA", "ECR_SCHEMA_PROD", "TEST_SCHEMA")
     ]
-    allowed_ecr_roles = [
-        "EBA Data Submitter",
-        "EBA Data Admin"
-    ]
-    allowed_oor_roles = []
     verifier_mode = os.environ.get("VERIFIER_ENV", "production")
     trusted_leis = []
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
@@ -34,8 +29,6 @@ def setup():
         "trustedLeis": trusted_leis if trusted_leis else [],
         "verifyRootOfTrust": verify_rot,
         "authAllowedSchemas": allowed_schemas,
-        "authAllowedEcrRoles": allowed_ecr_roles,
-        "authAllowedOorRoles": allowed_oor_roles
     }
 
     VerifierEnvironment.initialize(**ve_init_params)
@@ -291,28 +284,6 @@ def test_ecr(seeder):
         passed_filters, msg = multi_role_auth.cred_filters(ecr_cred_admin)
         assert passed_filters
         assert msg == f"Credential passed filters for user {hab.pre} with LEI {LEI1}"
-
-        # Test ECR with invalid role
-        ecr_cred_invalid = get_ecr_cred(
-            issuer=hab.pre,
-            recipient=hab.pre,
-            schema=Schema.ECR_SCHEMA,
-            registry=registry,
-            sedge=ecredge,
-            lei=LEI1,
-            role="INVALID_ROLE"  # Using an invalid role
-        )
-        hab, eccrdntler_invalid, ecsaid_invalid, eckmsgs_invalid, ectmsgs_invalid, ecimsgs_invalid, ecmsgs_invalid = get_cred(
-            hby, hab, regery, registry, verifier, Schema.ECR_SCHEMA, ecr_cred_invalid, seqner
-        )
-
-        auth = Authorizer(hby, vdb, eccrdntler_invalid.rgy.reger)
-        chain_success, chain_msg = auth.chain_filters(ecr_cred_invalid)
-        assert chain_success
-        assert chain_msg == f"QVI->LE->ECR_AUTH->ECR"
-        passed_filters, msg = auth.cred_filters(ecr_cred_invalid)
-        assert not passed_filters  # Should fail because of invalid role
-        assert "is not a valid submitter role" in msg
 
         data = '"@method": GET\n"@path": /verify/header\n"signify-resource": EHYfRWfM6RxYbzyodJ6SwYytlmCCW2gw5V-FsoX5BgGx\n"signify-timestamp": 2024-05-01T19:54:53.571000+00:00\n"@signature-params: (@method @path signify-resource signify-timestamp);created=1714593293;keyid=BOieebDzg4uaqZ2zuRAX1sTiCrD3pgGT3HtxqSEAo05b;alg=ed25519"'
         raw = data.encode("utf-8")

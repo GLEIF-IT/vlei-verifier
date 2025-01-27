@@ -48,16 +48,10 @@ def setup(hby, vdb, reger):
             "invalid configuration, invalid LEIs in configuration"
         )
 
-    accepted_roles = env.authAllowedEcrRoles
-    if not isinstance(accepted_roles, list):
+    accepted_schemas = env.authAllowedSchemas
+    if not isinstance(accepted_schemas, list):
         raise kering.ConfigurationError(
-            "invalid configuration, invalid ECR Roles in configuration"
-        )
-
-    accepted_roles = env.authAllowedOorRoles
-    if not isinstance(accepted_roles, list):
-        raise kering.ConfigurationError(
-            "invalid configuration, invalid OOR Roles in configuration"
+            "invalid configuration, invalid Allowed Schemas in configuration"
         )
 
     authorizer = Authorizer(hby, vdb, reger)
@@ -174,12 +168,6 @@ class Authorizer:
             elif len(self.env.trustedLeis) > 0 and creder.attrib["LEI"] not in self.env.trustedLeis:
                 # only process LEI filter if LEI list has been configured
                 res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
-            elif (creder.schema in (Schema.ECR_SCHEMA, Schema.ECR_SCHEMA_PROD)
-                  and creder.attrib["engagementContextRole"] not in self.env.authAllowedEcrRoles):
-                res = False, f"{creder.attrib["engagementContextRole"]} is not a valid submitter role"
-            elif (creder.schema in (Schema.OOR_SCHEMA,)
-                  and creder.attrib["officialRole"] not in self.env.authAllowedOorRoles):
-                res = False, f"{creder.attrib["officialRole"]} is not a valid submitter role"
             elif not (chain := self.chain_filters(creder))[0]:
                 res = chain
             else:
