@@ -83,8 +83,6 @@ You can customize the service behavior using these configuration options:
 - **`iurls`**: - OOBI URLs
 - **`durls`**: - Schema OOBI URLs
 - **`trustedLeis`**: A list of trusted LE identifiers.
-- **`allowedEcrRoles`**: Roles permitted for ECR credential authorization.
-- **`allowedOorRoles`**: Roles permitted for OOR credential authorization.
 - **`allowedSchemas`**: A list of schemas allowed for authorization.
 
 ### Default Configuration
@@ -92,11 +90,11 @@ You can customize the service behavior using these configuration options:
 The default configuration file, **`verifier-config-public.json`**, is located in the **`scripts/keri/cf`** directory. By
 default:
 
-- **`trustedLeis`**, **`allowedEcrRoles`**, and **`allowedSchemas`** are empty.
+- **`trustedLeis`** and **`allowedSchemas`** are empty.
     - This means Schema and Role checks will fail, and any credential authorization will be rejected.
-- You must populate **`allowedEcrRoles`** and **`allowedSchemas`** or use a pre-configured file from *
+- You must populate **`allowedSchemas`** or use a pre-configured file from *
   *`scripts/keri/cf/examples`**.
-- You can also use **`verifier-config-test.json`** which has values set for the allowedEcrRoles and allowedSchemas.
+- You can also use **`verifier-config-test.json`** which has values set for the allowedSchemas.
 
 ### Example Configurations
 

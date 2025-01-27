@@ -14,8 +14,6 @@ class VerifierEnvironment:
     mode: str = "production"
     verifyRootOfTrust: bool = True
     authAllowedSchemas: List = field(default_factory=lambda: [])
-    authAllowedEcrRoles: List = field(default_factory=lambda: [])
-    authAllowedOorRoles: List = field(default_factory=lambda: [])
 
     _instance: "VerifierEnvironment" = None
 

@@ -125,8 +125,6 @@ def launch(args):
     allowed_schemas = [
         getattr(Schema, x) for x in config.get("allowedSchemas", []) if getattr(Schema, x, None)
     ]
-    allowed_ecr_roles = config.get("allowedEcrRoles", [])
-    allowed_oor_roles = config.get("allowedOorRoles", [])
     verifier_mode = os.environ.get("VERIFIER_ENV", "production")
     trusted_leis = config.get("trustedLeis", [])
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
@@ -141,10 +139,6 @@ def launch(args):
     print("ALLOWED", allowed_schemas)
     if allowed_schemas:
         ve_init_params["authAllowedSchemas"] = allowed_schemas
-    if allowed_ecr_roles:
-        ve_init_params["authAllowedEcrRoles"] = allowed_ecr_roles
-    if allowed_oor_roles:
-        ve_init_params["authAllowedOorRoles"] = allowed_oor_roles
 
     ve = VerifierEnvironment.initialize(**ve_init_params)
     if aeid is None:

@@ -1,5 +1,18 @@
 # Changelog
 
+
+## [v0.1.0] - 2025-01-27
+
+### Removed
+- **Role Validation in Verifier**:  
+  - The Verifier no longer validates roles for Engagement Context Role (ECR) or Official Organizational Role (OOR) credentials.  
+  - Configuration options `allowed_ecr_roles` and `allowed_oor_roles` have been removed.
+
+### Changed
+- **Role Validation Logic**:  
+  - Responsibility for role validation has been shifted to the **Reg-Pilot-Filer** service.  
+  - This change ensures better separation of concerns between services and makes vlei-verifier more generic.
+
 ## [v0.0.4] - 2024-12-25
 
 ### Added

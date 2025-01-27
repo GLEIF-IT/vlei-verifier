@@ -23,11 +23,6 @@ def setup():
     allowed_schemas = [
         getattr(Schema, x) for x in ("ECR_SCHEMA", "ECR_SCHEMA_PROD")
     ]
-    allowed_ecr_roles = [
-        "EBA Data Submitter",
-        "EBA Data Admin"
-    ]
-    allowed_oor_roles = []
     verifier_mode = os.environ.get("VERIFIER_ENV", "production")
     trusted_leis = []
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
@@ -37,8 +32,6 @@ def setup():
         "trustedLeis": trusted_leis if trusted_leis else [],
         "verifyRootOfTrust": verify_rot,
         "authAllowedSchemas": allowed_schemas,
-        "authAllowedEcrRoles": allowed_ecr_roles,
-        "authAllowedOorRoles": allowed_oor_roles
     }
 
     VerifierEnvironment.initialize(**ve_init_params)
