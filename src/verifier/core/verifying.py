@@ -361,6 +361,7 @@ class PresentationResourceEndpoint:
             rep.data = json.dumps(
                 dict(
                     creds=json.dumps(creds),
+                    aid=aid,
                     msg=f"{said} for {aid} as {type} is {cred_state.state}",
                 )
             ).encode("utf-8")
@@ -369,6 +370,7 @@ class PresentationResourceEndpoint:
             rep.data = json.dumps(
                 dict(
                     creds=json.dumps(creds),
+                    aid=aid,
                     msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
                 )
             ).encode("utf-8")
