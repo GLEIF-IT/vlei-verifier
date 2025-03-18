@@ -1,5 +1,6 @@
 import datetime
 import os
+from typing import Literal
 
 import falcon
 import json
@@ -18,9 +19,11 @@ from verifier.core.basing import (
     AUTH_PENDING,
     AUTH_SUCCESS,
     AUTH_EXPIRE,
-    AUTH_FAIL
+    AUTH_FAIL, AidProcessState, AID_CRYPT_INVALID, AID_CRYPT_VALID, Account
 )
 from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder
+
+PresentationType = Literal["AID", "CREDENTIAL"]
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -294,87 +297,139 @@ class PresentationResourceEndpoint:
         parsing.Parser().parse(ims=ims, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
 
         found = False
+        presentation_type: PresentationType = "CREDENTIAL"
         saids = []
+
+        if not self.vry.cues:
+            presentation_type = "AID"
+            while self.hby.kvy.cues:
+                msg = self.hby.kvy.cues.popleft()
+                if "serder" in msg:
+                    serder = msg["serder"]
+                    if serder.sad.get("i") == said:
+                        found = True
+            self.hby.kvy.cues.clear()
+
         while self.vry.cues:
             msg = self.vry.cues.popleft()
             if "creder" in msg:
                 creder = msg["creder"]
                 if creder.said == said:
                     found = True
+                    break
 
         self.vry.cues.clear()
+        if presentation_type == "CREDENTIAL":
+            if not found:
+                info = f"Presented credential {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
+                print(info)
+                cred_state = CredProcessState(
+                    said=said, state=CRED_CRYPT_INVALID, info=info
+                )
+                self.vdb.iss.pin(keys=(said,), val=cred_state)
+                rep.status = falcon.HTTP_BAD_REQUEST
+                rep.data = json.dumps(
+                    dict(
+                        msg=f"credential {said} from body of request did not cryptographically verify"
+                    )
+                ).encode("utf-8")
+                return
 
-        if not found:
-            info = f"Presented credential {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
+            saider = coring.Saider(qb64=said)
+            cred_attrs = creder.sad["a"]
+            creds = None
+            aid = None
+            saids = None
+            type = None
+            if "i" in cred_attrs:
+                # use issuee AID
+                aid = cred_attrs["i"]
+                saids = self.vry.reger.subjs.get(
+                    keys=aid,
+                )
+                creds = self.vry.reger.cloneCreds(saids, self.hby.db)
+                type = "issuee"
+            else:
+                # no issuee AID, use issuer
+                aid = creder.sad["i"]
+                saids = self.vry.reger.issus.get(
+                    keys=aid,
+                )
+                creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
+                type = "issuer"
+
+            # Here we don't process credentials that have been revoked(We don't update their state)
+            # If the credential was revoked we shouldn't update it's state with the new one
+            if not self.vdb.iss.get(keys=(aid,)) or (
+                    self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED or self.vdb.iss.get(keys=(aid,)).said != said):
+                print(f"{aid} account cleared after successful presentation")
+                # clear any previous login, now that a valid credential has been presented
+                self.vdb.accts.rem(keys=(aid,))
+
+                info = f"Credential {said} presented for {aid} is cryptographically valid"
+                print(info)
+                cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
+                self.vdb.iss.pin(keys=(aid,), val=cred_state)
+                self.vdb.iss.pin(keys=(said,), val=cred_state)
+                # Here we need to check if the credential was revoked and if so we update it's state to AUTH_REVOKED
+                process_revocations(self.vdb, creds, said)
+                rep.status = falcon.HTTP_ACCEPTED
+                rep.data = json.dumps(
+                    dict(
+                        creds=json.dumps(creds),
+                        aid=aid,
+                        msg=f"{said} for {aid} as {type} is {cred_state.state}",
+                    )
+                ).encode("utf-8")
+            else:
+                rep.status = falcon.HTTP_ACCEPTED
+                rep.data = json.dumps(
+                    dict(
+                        creds=json.dumps(creds),
+                        aid=aid,
+                        msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
+                    )
+                ).encode("utf-8")
+            return
+        elif presentation_type == "AID":
+            aid = said
+            state = self.vdb.icp.get(keys=(said,))
+            if state:
+                rep.status = falcon.HTTP_ACCEPTED
+                rep.data = json.dumps(
+                    dict(
+                        aid=aid,
+                        msg=f"AID {aid} presentation status: {state.state}",
+                    )
+                ).encode("utf-8")
+                return
+            if not found:
+                info = f"Presented AID {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
+                print(info)
+                aid_state = AidProcessState(
+                    aid=aid, state=AID_CRYPT_INVALID, info=info
+                )
+                self.vdb.icp.pin(keys=(said,), val=aid_state)
+                rep.status = falcon.HTTP_BAD_REQUEST
+                rep.data = json.dumps(
+                    dict(
+                        msg=f"AID {aid} from body of request did not cryptographically verify"
+                    )
+                ).encode("utf-8")
+                return
+
+            info = f"AID {aid} presented is cryptographically valid"
             print(info)
-            cred_state = CredProcessState(
-                said=said, state=CRED_CRYPT_INVALID, info=info
-            )
-            self.vdb.iss.pin(keys=(said,), val=cred_state)
-            rep.status = falcon.HTTP_BAD_REQUEST
+            aid_state = AidProcessState(aid=aid, state=AID_CRYPT_VALID, info=info)
+            self.vdb.icp.pin(keys=(aid,), val=aid_state)
+            rep.status = falcon.HTTP_ACCEPTED
             rep.data = json.dumps(
                 dict(
-                    msg=f"credential {said} from body of request did not cryptographically verify"
+                    aid=aid,
+                    msg=f"AID {aid} presentation status: {aid_state.state}",
                 )
             ).encode("utf-8")
             return
-
-        saider = coring.Saider(qb64=said)
-        cred_attrs = creder.sad["a"]
-        creds = None
-        aid = None
-        saids = None
-        type = None
-        if "i" in cred_attrs:
-            # use issuee AID
-            aid = cred_attrs["i"]
-            saids = self.vry.reger.subjs.get(
-                keys=aid,
-            )
-            creds = self.vry.reger.cloneCreds(saids, self.hby.db)
-            type = "issuee"
-        else:
-            # no issuee AID, use issuer
-            aid = creder.sad["i"]
-            saids = self.vry.reger.issus.get(
-                keys=aid,
-            )
-            creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
-            type = "issuer"
-
-        # Here we don't process credentials that have been revoked(We don't update their state)
-        # If the credential was revoked we shouldn't update it's state with the new one
-        if not self.vdb.iss.get(keys=(aid,)) or (
-                self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED or self.vdb.iss.get(keys=(aid,)).said != said):
-            print(f"{aid} account cleared after successful presentation")
-            # clear any previous login, now that a valid credential has been presented
-            self.vdb.accts.rem(keys=(aid,))
-
-            info = f"Credential {said} presented for {aid} is cryptographically valid"
-            print(info)
-            cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
-            self.vdb.iss.pin(keys=(aid,), val=cred_state)
-            self.vdb.iss.pin(keys=(said,), val=cred_state)
-            # Here we need to check if the credential was revoked and if so we update it's state to AUTH_REVOKED
-            process_revocations(self.vdb, creds, said)
-            rep.status = falcon.HTTP_ACCEPTED
-            rep.data = json.dumps(
-                dict(
-                    creds=json.dumps(creds),
-                    aid=aid,
-                    msg=f"{said} for {aid} as {type} is {cred_state.state}",
-                )
-            ).encode("utf-8")
-        else:
-            rep.status = falcon.HTTP_ACCEPTED
-            rep.data = json.dumps(
-                dict(
-                    creds=json.dumps(creds),
-                    aid=aid,
-                    msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
-                )
-            ).encode("utf-8")
-        return
 
     def on_get(self, req, rep, said):
         """Loop over any credential presentations in the iss database.
@@ -430,6 +485,62 @@ class AuthorizationResourceEnd:
         self.hby = hby
         self.vdb = vdb
 
+    def _process_aid_auth(self, aid: str):
+        acct: Account = self.vdb.accts.get(keys=(aid,))
+        state: AidProcessState = self.vdb.icp.get(keys=(aid,))
+        aid_presented = True
+        auth_success = False
+        if acct is None:
+            auth_success = False
+            if state is None:
+                aid_presented = False
+                data = dict(
+                    msg=f"no presentation found for identifier {aid}"
+                )
+            else:
+                data = dict(
+                    msg=f"identifier {aid} presentation failed with status {state.state}"
+                )
+        else:
+            auth_success = True
+            data = dict(
+                aid=aid,
+                said=aid,
+                lei=None,
+                role=None,
+                msg=f"AID {aid} has a valid AID login account",
+            )
+        return auth_success, aid_presented, data
+
+    def _process_cred_auth(self, aid: str):
+        acct: Account = self.vdb.accts.get(keys=(aid,))
+        state: CredProcessState = self.vdb.iss.get(keys=(aid,))
+        cred_presented = True
+        auth_success = False
+        if acct is None or state is None or state.state == AUTH_EXPIRE:
+            auth_success = False
+            if state is None:
+                cred_presented = False
+                data = dict(
+                    msg=f"identifier {aid} has no access and no authorization being processed"
+                )
+            else:
+                data = dict(
+                    msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, info: {state.info}"
+                )
+        else:
+            state: CredProcessState = self.vdb.iss.get(keys=(aid,))
+            auth_success = True
+            data = dict(
+                aid=aid,
+                said=acct.said,
+                lei=acct.lei,
+                role=state.role,
+                msg=f"AID {aid} w/ lei {acct.lei} has valid login account",
+            )
+
+        return auth_success, cred_presented, data
+
     def on_get(self, req, rep, aid):
         """Authorization Resource GET Method
 
@@ -459,38 +570,17 @@ class AuthorizationResourceEnd:
 
         """
         rep.content_type = "application/json"
-        acct = self.vdb.accts.get(keys=(aid,))
-        state: CredProcessState = self.vdb.iss.get(keys=(aid,))
         if aid not in self.hby.kevers:
-            rep.status = falcon.HTTP_UNAUTHORIZED
-            rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
-        elif acct is None or state is None or state.state == AUTH_EXPIRE:
-            rep.status = falcon.HTTP_UNAUTHORIZED
-            if state is None:
-                rep.data = json.dumps(
-                    dict(
-                        msg=f"identifier {aid} has no access and no authorization being processed"
-                    )
-                ).encode("utf-8")
-            else:
-                rep.data = json.dumps(
-                    dict(
-                        msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, info: {state.info}"
-                    )
-                ).encode("utf-8")
-        else:
-            state: CredProcessState = self.vdb.iss.get(keys=(aid,))
-            body = dict(
-                aid=aid,
-                said=acct.said,
-                lei=acct.lei,
-                role=state.role,
-                msg=f"AID {aid} w/ lei {acct.lei} has valid login account",
-            )
-
-            rep.status = falcon.HTTP_OK
-            rep.data = json.dumps(body).encode("utf-8")
-        return
+            status = falcon.HTTP_UNAUTHORIZED
+            data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
+            return status, data
+        aid_auth_status, aid_presented, aid_auth_data = self._process_aid_auth(aid)
+        cred_auth_status, cred_presented, cred_auth_data = self._process_cred_auth(aid)
+        rep.status = falcon.HTTP_OK if aid_auth_status or cred_auth_status else falcon.HTTP_UNAUTHORIZED
+        response = cred_auth_data
+        if not cred_auth_status and not cred_presented and aid_presented:
+            response = aid_auth_data
+        rep.data = json.dumps(response).encode("utf-8")
 
 
 class RequestVerifierResourceEnd:
@@ -568,15 +658,6 @@ class RequestVerifierResourceEnd:
                 dict(msg=f"unknown {aid} used to sign header")
             ).encode("utf-8")
             return
-
-        # Removed this check in order to process revocations with signed headers correctly
-        # acct = self.vdb.accts.get(keys=(aid,))
-        # if acct is None:
-        #     rep.status = falcon.HTTP_FORBIDDEN
-        #     rep.data = json.dumps(
-        #         dict(msg=f"identifier {aid} has no valid credential for access")
-        #     ).encode("utf-8")
-        #     return
 
         kever = self.hby.kevers[aid]
         verfers = kever.verfers

@@ -8,7 +8,7 @@ Database support
 import os
 from collections import namedtuple
 from dataclasses import dataclass, asdict, field
-from typing import List
+from typing import List, Literal
 
 from keri.core import coring
 from keri.db import dbing, subing, koming
@@ -28,6 +28,17 @@ class CredProcessState:
     def __iter__(self):
         return iter(asdict(self).values())
 
+@dataclass
+class AidProcessState:
+    aid: Optional[str] = None
+    state: Optional[str] = None
+    info: Optional[str] = None
+    date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+
+    def __iter__(self):
+        return iter(asdict(self).values())
+
+# Credential states
 CRED_CRYPT_INVALID = "Credential cryptographically invalid"
 CRED_CRYPT_VALID = "Credential cryptographically valid"
 CRED_AGE_OFF = "Credential presentation has aged off"
@@ -36,6 +47,12 @@ AUTH_PENDING = "Credential pending authorization"
 AUTH_SUCCESS = "Credential authorized"
 AUTH_FAIL = "Credential unauthorized"
 AUTH_EXPIRE = "Credential authorization expired"
+
+#AID states
+AID_CRYPT_INVALID = "AID cryptographically invalid"
+AID_CRYPT_VALID = "AID cryptographically valid"
+AID_AUTH_SUCCESS = "AID authorized"
+AID_AUTH_FAIL = "AID unauthorized"
 
 def cred_age_off(state: CredProcessState, timeout: float):
     # cancel presentations that have been around longer than timeout
@@ -50,6 +67,7 @@ def cred_age_off(state: CredProcessState, timeout: float):
 # @dataclass
 # class CredProcessStates:
 #     states: List[CredProcessState] = []
+
 @dataclass
 class Account:
     """ Account dataclass for tracking"""
@@ -146,6 +164,7 @@ class VerifierBaser(dbing.LMDBer):
             kwa (dict): additional key word argument pass through for database initialization
         """
         self.iss = None
+        self.icp = None
         self.rev = None
 
         self.accts = None
@@ -183,6 +202,9 @@ class VerifierBaser(dbing.LMDBer):
 
         """
         super(VerifierBaser, self).reopen(**kwa)
+
+        # presentations that are waiting for the AID to be received and parsed
+        self.icp = koming.Komer(db=self, subkey='icp.', schema=AidProcessState)
 
         # presentations that are waiting for the credential to be received and parsed
         self.iss = koming.Komer(db=self, subkey='iss.', schema=CredProcessState)

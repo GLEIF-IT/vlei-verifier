@@ -16,7 +16,7 @@ from keri.core import coring
 from keri.help import helping
 
 from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED, AUTH_PENDING, AUTH_SUCCESS, AUTH_EXPIRE, \
-    AUTH_FAIL, CRED_CRYPT_VALID
+    AUTH_FAIL, CRED_CRYPT_VALID, AID_CRYPT_VALID, AidProcessState, AID_AUTH_SUCCESS
 from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
 from verifier.core.resolve_env import VerifierEnvironment
 
@@ -136,9 +136,31 @@ class Authorizer:
                 else:
                     cred_state = CredProcessState(said=state.said, state=AUTH_FAIL, info=info)
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
+
             else:
                 # No need to process state.state == CRED_CRYPT_INVALID or state.state == AUTH_EXPIRE or state.state == AUTH_FAIL or state.state == AUTH_REVOKED or state.state == AUTH_SUCCESS:
                 continue
+
+
+    def processAidPresentations(self):
+        """Loop over AID presentations in the icp database.
+
+        AID presentations are placed in the icp database and this loop processes them, first checking to see
+        if the AID has been cryptographically verified then applies the business logic.
+
+        """
+
+        for (aid,), state in self.vdb.icp.getItemIter():
+            # TODO: add AID authorization business logic
+            if state.state == AID_CRYPT_VALID:
+                info = "AID is authorized"
+                cur_account: Account = self.vdb.accts.get(keys=(aid,))
+                if not cur_account:
+                    self.vdb.icp.rem(keys=(aid,))
+                    aid_state = AidProcessState(aid=state.aid, state=AID_AUTH_SUCCESS, info=info)
+                    acct = Account(aid=aid, said=None, lei=None)
+                    self.vdb.accts.pin(keys=(aid,), val=acct)
+                    self.vdb.icp.pin(keys=(aid,), val=aid_state)
 
     def cred_filters(self, creder) -> tuple[bool, str]:
         """Process a fully verified engagement context role vLEI credential presentation
@@ -341,6 +363,7 @@ class Authorizer:
         Process credental presentation pipelines
 
         """
+        self.processAidPresentations()
         self.processPresentations()
         self.processRevocations()
 
