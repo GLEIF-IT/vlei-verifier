@@ -571,9 +571,9 @@ class AuthorizationResourceEnd:
         """
         rep.content_type = "application/json"
         if aid not in self.hby.kevers:
-            status = falcon.HTTP_UNAUTHORIZED
-            data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
-            return status, data
+            rep.status = falcon.HTTP_UNAUTHORIZED
+            rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
+            return
         aid_auth_status, aid_presented, aid_auth_data = self._process_aid_auth(aid)
         cred_auth_status, cred_presented, cred_auth_data = self._process_cred_auth(aid)
         rep.status = falcon.HTTP_OK if aid_auth_status or cred_auth_status else falcon.HTTP_UNAUTHORIZED
