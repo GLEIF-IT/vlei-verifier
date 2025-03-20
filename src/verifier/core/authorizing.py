@@ -19,6 +19,7 @@ from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED, AUTH_P
     AUTH_FAIL, CRED_CRYPT_VALID, AID_CRYPT_VALID, AidProcessState, AID_AUTH_SUCCESS
 from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
 from verifier.core.resolve_env import VerifierEnvironment
+from verifier.core.utils import add_state_to_state_history
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
 DEFAULT_EBA_ROLE = "EBA Data Submitter"
@@ -114,6 +115,7 @@ class Authorizer:
                 cred_state = CredProcessState(said=state.said, state=AUTH_EXPIRE,
                                               info=f"Cred state exceeded {self.TimeoutAuth}")
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
+                add_state_to_state_history(self.vdb, aid, cred_state)
                 print(
                     f"{state.said} for {aid}, has expired: {age} greater than {self.TimeoutAuth}"
                 )
@@ -136,6 +138,7 @@ class Authorizer:
                 else:
                     cred_state = CredProcessState(said=state.said, state=AUTH_FAIL, info=info)
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
+                add_state_to_state_history(self.vdb, aid, cred_state)
 
             else:
                 # No need to process state.state == CRED_CRYPT_INVALID or state.state == AUTH_EXPIRE or state.state == AUTH_FAIL or state.state == AUTH_REVOKED or state.state == AUTH_SUCCESS:
@@ -161,6 +164,7 @@ class Authorizer:
                     acct = Account(aid=aid, said=None, lei=None)
                     self.vdb.accts.pin(keys=(aid,), val=acct)
                     self.vdb.icp.pin(keys=(aid,), val=aid_state)
+                    add_state_to_state_history(self.vdb, aid, aid_state)
 
     def cred_filters(self, creder) -> tuple[bool, str]:
         """Process a fully verified engagement context role vLEI credential presentation

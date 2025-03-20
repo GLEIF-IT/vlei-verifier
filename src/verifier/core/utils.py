@@ -1,11 +1,12 @@
 import json
+import time
+from typing import List
 
 from keri import kering
 from keri.core import MtrDex, coring, parsing
 import keri.help.helping as help
 from keri.db import basing
-from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust
-
+from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust, AidProcessState, StateHistory
 
 class DigerBuilder:
     @staticmethod
@@ -60,6 +61,7 @@ def add_root_of_trust(ims, hby, tvy, vry, vdb, aid, oobi):
     else:
         return False
 
+
 def add_oobi(hby, oobi):
     try:
         obr = basing.OobiRecord(date=help.toIso8601())
@@ -69,3 +71,24 @@ def add_oobi(hby, oobi):
         return False
 
 
+def add_state_to_state_history(vdb, aid: str, state: CredProcessState | AidProcessState):
+    history_object: StateHistory = vdb.hst.get(keys=(aid,))
+    update_time = time.time()
+    if history_object:
+        history_object.state_history.append(state)
+        history_object.last_update = update_time
+        vdb.hst.pin(keys=(aid,), val=history_object)
+    else:
+        state_history: List[CredProcessState | AidProcessState] = [state]
+        history_object: StateHistory = StateHistory(aid, update_time, state_history)
+        vdb.hst.pin(keys=(aid,), val=history_object)
+
+    return history_object
+
+
+def get_state_to_state_history(vdb, aid: str):
+    history_object: StateHistory = vdb.hst.get(keys=(aid,))
+    if history_object:
+        return history_object.state_history
+    else:
+        return []

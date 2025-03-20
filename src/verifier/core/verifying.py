@@ -21,7 +21,8 @@ from verifier.core.basing import (
     AUTH_EXPIRE,
     AUTH_FAIL, AidProcessState, AID_CRYPT_INVALID, AID_CRYPT_VALID, Account
 )
-from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder
+from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder, \
+    add_state_to_state_history, get_state_to_state_history
 
 PresentationType = Literal["AID", "CREDENTIAL"]
 
@@ -64,6 +65,8 @@ def loadEnds(app, hby, vdb, tvy, vry):
     healthEnd = HealthEndpoint()
     app.add_route("/health", healthEnd)
     credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
+    stateHistEnd = StateHistoryResourceEndpoint(vdb)
+    app.add_route("/presentations/history/{aid}", stateHistEnd)
     app.add_route("/presentations/{said}", credEnd)
     rotEnd = RootOfTrustResourceEndpoint(hby, vdb, tvy, vry)
     app.add_route("/root_of_trust/{aid}", rotEnd)
@@ -221,6 +224,58 @@ class OobiResourceEndpoint:
             ).encode("utf-8")
 
 
+class StateHistoryResourceEndpoint:
+    """OOBI presentation resource endpoint class
+
+    This class allows for to add new OOBI.
+
+    """
+
+    def __init__(self, vdb):
+        """Get State History resource endpoint instance
+
+        Parameters:
+            hby (Habery): Database environment for exposed KERI AIDs
+        """
+        self.vdb = vdb
+
+    def on_get(self, req, rep, aid):
+        """State History  Resource GET Method
+
+        Parameters:
+            req: falcon.Request HTTP request
+            rep: falcon.Response HTTP response
+            aid: AID of the requestor
+        ---
+         summary: Get State History for a given aid
+         description: Get State History for a given aid
+         tags:
+            - State History
+         requestBody:
+             required: true
+             content:
+                application/json:
+                  schema:
+                    type: application/json
+                    format: json
+         responses:
+           200:
+              description: State History returned
+
+        """
+        rep.content_type = "application/json"
+        state_history = get_state_to_state_history(self.vdb, aid)
+
+        rep.status = falcon.HTTP_ACCEPTED
+        rep.data = json.dumps(
+            dict(
+                history=state_history,
+                aid=aid,
+                msg=f"Successfully retrieved State History for AID: {aid}",
+            )
+        ).encode("utf-8")
+
+
 class PresentationResourceEndpoint:
     """Credential presentation resource endpoint class
 
@@ -327,6 +382,7 @@ class PresentationResourceEndpoint:
                     said=said, state=CRED_CRYPT_INVALID, info=info
                 )
                 self.vdb.iss.pin(keys=(said,), val=cred_state)
+                add_state_to_state_history(self.vdb, said, cred_state)
                 rep.status = falcon.HTTP_BAD_REQUEST
                 rep.data = json.dumps(
                     dict(
@@ -371,6 +427,7 @@ class PresentationResourceEndpoint:
                 cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 self.vdb.iss.pin(keys=(said,), val=cred_state)
+                add_state_to_state_history(self.vdb, aid, cred_state)
                 # Here we need to check if the credential was revoked and if so we update it's state to AUTH_REVOKED
                 process_revocations(self.vdb, creds, said)
                 rep.status = falcon.HTTP_ACCEPTED
@@ -410,6 +467,7 @@ class PresentationResourceEndpoint:
                     aid=aid, state=AID_CRYPT_INVALID, info=info
                 )
                 self.vdb.icp.pin(keys=(said,), val=aid_state)
+                add_state_to_state_history(self.vdb, aid, aid_state)
                 rep.status = falcon.HTTP_BAD_REQUEST
                 rep.data = json.dumps(
                     dict(
@@ -422,6 +480,7 @@ class PresentationResourceEndpoint:
             print(info)
             aid_state = AidProcessState(aid=aid, state=AID_CRYPT_VALID, info=info)
             self.vdb.icp.pin(keys=(aid,), val=aid_state)
+            add_state_to_state_history(self.vdb, aid, aid_state)
             rep.status = falcon.HTTP_ACCEPTED
             rep.data = json.dumps(
                 dict(
