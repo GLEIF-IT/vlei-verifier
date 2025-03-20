@@ -6,6 +6,7 @@ verifier.core.basing module
 Database support
 """
 import os
+import time
 from collections import namedtuple
 from dataclasses import dataclass, asdict, field
 from typing import List, Literal
@@ -17,6 +18,23 @@ from keri.help.helping import nowUTC
 from typing import Optional
 import datetime
 
+# Credential states
+CRED_CRYPT_INVALID = "Credential cryptographically invalid"
+CRED_CRYPT_VALID = "Credential cryptographically valid"
+CRED_AGE_OFF = "Credential presentation has aged off"
+AUTH_REVOKED = "Credential revoked"
+AUTH_PENDING = "Credential pending authorization"
+AUTH_SUCCESS = "Credential authorized"
+AUTH_FAIL = "Credential unauthorized"
+AUTH_EXPIRE = "Credential authorization expired"
+
+# AID states
+AID_CRYPT_INVALID = "AID cryptographically invalid"
+AID_CRYPT_VALID = "AID cryptographically valid"
+AID_AUTH_SUCCESS = "AID authorized"
+AID_AUTH_FAIL = "AID unauthorized"
+
+
 @dataclass
 class CredProcessState:
     said: Optional[str] = None
@@ -24,9 +42,10 @@ class CredProcessState:
     info: Optional[str] = None
     role: Optional[str] = None
     date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    
+
     def __iter__(self):
         return iter(asdict(self).values())
+
 
 @dataclass
 class AidProcessState:
@@ -38,21 +57,15 @@ class AidProcessState:
     def __iter__(self):
         return iter(asdict(self).values())
 
-# Credential states
-CRED_CRYPT_INVALID = "Credential cryptographically invalid"
-CRED_CRYPT_VALID = "Credential cryptographically valid"
-CRED_AGE_OFF = "Credential presentation has aged off"
-AUTH_REVOKED = "Credential revoked"
-AUTH_PENDING = "Credential pending authorization"
-AUTH_SUCCESS = "Credential authorized"
-AUTH_FAIL = "Credential unauthorized"
-AUTH_EXPIRE = "Credential authorization expired"
+@dataclass
+class StateHistory:
+    aid: Optional[str] = None
+    last_update: float = field(default_factory=lambda: time.time())
+    state_history: List[CredProcessState | AidProcessState] = field(default_factory=lambda: [])
 
-#AID states
-AID_CRYPT_INVALID = "AID cryptographically invalid"
-AID_CRYPT_VALID = "AID cryptographically valid"
-AID_AUTH_SUCCESS = "AID authorized"
-AID_AUTH_FAIL = "AID unauthorized"
+    def __iter__(self):
+        return iter(asdict(self).values())
+
 
 def cred_age_off(state: CredProcessState, timeout: float):
     # cancel presentations that have been around longer than timeout
@@ -60,9 +73,11 @@ def cred_age_off(state: CredProcessState, timeout: float):
     age = now - datetime.datetime.fromisoformat(state.date)
     state = None
     if state.state != CRED_AGE_OFF and age > datetime.timedelta(seconds=timeout):
-        state = CredProcessState(said=state.said, state=CRED_AGE_OFF, info=f"Credential was {age} which exceeds timeout threshold {timeout}")
+        state = CredProcessState(said=state.said, state=CRED_AGE_OFF,
+                                 info=f"Credential was {age} which exceeds timeout threshold {timeout}")
         return True, state
     return False, state
+
 
 # @dataclass
 # class CredProcessStates:
@@ -74,6 +89,7 @@ class Account:
     aid: str = None
     said: str = None
     lei: str = None
+
 
 @dataclass
 class RootOfTrust:
@@ -91,17 +107,20 @@ class ReportStats:
     size: int = 0
     message: str = ""
 
+
 # Report Statuses.
 Reportage = namedtuple("Reportage", "accepted verified failed")
 
 # Referencable report status enumeration
 ReportStatus = Reportage(accepted="accepted", verified="verified", failed="failed")
 
+
 @dataclass
 class UploadStatus:
     """ Upload status dataclass for tracking"""
     status: str = None
     saids: List[str] = None
+
 
 def delete_upload_status(vdb, status: ReportStats, said: str):
     """
@@ -116,7 +135,8 @@ def delete_upload_status(vdb, status: ReportStats, said: str):
     if statuses and said in statuses.saids:
         statuses.saids.remove(said)
         vdb.stts.pin(keys=(status,), val=statuses)
-    
+
+
 def save_upload_status(vdb, status: ReportStats, said: str):
     """
     Add status to the status database
@@ -132,7 +152,8 @@ def save_upload_status(vdb, status: ReportStats, said: str):
     statuses.saids.append(said)
     statuses.saids = list(set(statuses.saids))
     vdb.stts.pin(keys=(status,), val=statuses)
-    
+
+
 # def save_cred_state(vdb, state: CredProcessState, said: str, aid: str):
 #     """
 #     Add status to the status database
@@ -165,6 +186,7 @@ class VerifierBaser(dbing.LMDBer):
         """
         self.iss = None
         self.icp = None
+        self.hst = None
         self.rev = None
 
         self.accts = None
@@ -208,6 +230,9 @@ class VerifierBaser(dbing.LMDBer):
 
         # presentations that are waiting for the credential to be received and parsed
         self.iss = koming.Komer(db=self, subkey='iss.', schema=CredProcessState)
+
+        # AIDs and credentials presentations/authorizations history
+        self.hst = koming.Komer(db=self, subkey='hst.', schema=StateHistory)
 
         # revocations that are waiting for the TEL event to be received and processed
         self.rev = subing.CesrSuber(db=self, subkey='rev.', klas=coring.Dater)

@@ -12,7 +12,7 @@ import multicommand
 import pytest
 from hio.base import doing
 
-from verifier.core.authorizing import Schema
+from verifier.core.constants import Schema
 
 from keri import kering
 from keri.core import scheming, coring, routing, eventing, parsing
