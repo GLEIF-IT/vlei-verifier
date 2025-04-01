@@ -4,7 +4,6 @@ from typing import Literal
 
 import falcon
 import json
-
 from keri import kering
 from keri.core import coring, parsing, Siger
 from keri.vdr import verifying, eventing
@@ -21,8 +20,10 @@ from verifier.core.basing import (
     AUTH_EXPIRE,
     AUTH_FAIL, AidProcessState, AID_CRYPT_INVALID, AID_CRYPT_VALID, Account
 )
+from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder, \
-    add_state_to_state_history, get_state_to_state_history
+    add_state_to_state_history, get_state_to_state_history, verify_signed_headers, SignatureVerificationStatus, \
+    process_signature_headers, SignatureHeaderError
 
 PresentationType = Literal["AID", "CREDENTIAL"]
 
@@ -629,6 +630,26 @@ class AuthorizationResourceEnd:
 
         """
         rep.content_type = "application/json"
+        env = VerifierEnvironment.resolve_env()
+        if env.mode == "production":
+            headers = req.headers
+            try:
+                sign, encoded_data = process_signature_headers(headers, req)
+            except SignatureHeaderError as e:
+                rep.status = falcon.HTTP_BAD_REQUEST
+                rep.data = json.dumps(dict(msg=str(e))).encode("utf-8")
+                return
+
+            verification_status, verification_message = verify_signed_headers(self.hby, aid, sign, encoded_data)
+            if verification_status == SignatureVerificationStatus.UNAUTHORIZED:
+                rep.status = falcon.HTTP_UNAUTHORIZED
+                rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
+                return
+            if verification_status == SignatureVerificationStatus.BAD_SIGNATURE:
+                rep.status = falcon.HTTP_BAD_REQUEST
+                rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
+                return
+
         if aid not in self.hby.kevers:
             rep.status = falcon.HTTP_UNAUTHORIZED
             rep.data = json.dumps(dict(msg=f"unknown AID: {aid}")).encode("utf-8")
@@ -718,30 +739,25 @@ class RequestVerifierResourceEnd:
             ).encode("utf-8")
             return
 
-        kever = self.hby.kevers[aid]
-        verfers = kever.verfers
-        try:
-            cigar = coring.Cigar(qb64=sign)
-        except Exception as ex:
+        verification_status, verification_message = verify_signed_headers(self.hby, aid, sign, encoded_data)
+
+        if verification_status == SignatureVerificationStatus.BAD_SIGNATURE:
             rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(
                 dict(
-                    msg=f"{aid} provided invalid Cigar signature on encoded request data: {ex}"
+                    msg=verification_message
                 )
             ).encode("utf-8")
-            return
-
-        if not verfers[0].verify(sig=cigar.raw, ser=encoded_data):
+        elif verification_status == SignatureVerificationStatus.UNAUTHORIZED:
             rep.status = falcon.HTTP_UNAUTHORIZED
             rep.data = json.dumps(
                 dict(
-                    msg=f"{aid} signature (Cigar) verification failed on encoding of request data"
+                    msg=verification_message
                 )
             ).encode("utf-8")
-            return
-
-        rep.status = falcon.HTTP_ACCEPTED
-        rep.data = json.dumps(dict(msg="Signature Valid")).encode("utf-8")
+        else:
+            rep.status = falcon.HTTP_ACCEPTED
+            rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
         return
 
 

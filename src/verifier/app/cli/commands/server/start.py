@@ -125,7 +125,24 @@ def launch(args):
     allowed_schemas = [
         getattr(Schema, x) for x in config.get("allowedSchemas", []) if getattr(Schema, x, None)
     ]
-    verifier_mode = os.environ.get("VERIFIER_ENV", "production")
+    """Verifier Mode Configuration
+
+    The verifier can run in two modes:
+
+    'production' mode (default):
+    - Enforces signed header verification for /authorizations requests 
+    - /root_of_trust endpoint is disabled for security
+    - Recommended for production deployments
+
+    'test' mode:
+    - Disables signed header verification for /authorizations requests
+    - Enables /root_of_trust endpoint to dynamically add new roots of trust 
+    - Only recommended for testing and development
+
+    Mode can be set via VERIFIER_MODE environment variable:
+    export VERIFIER_MODE=test|production
+    """
+    verifier_mode = os.environ.get("VERIFIER_MODE", "production")
     trusted_leis = config.get("trustedLeis", [])
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
 
