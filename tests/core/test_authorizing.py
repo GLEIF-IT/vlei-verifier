@@ -20,7 +20,7 @@ def setup():
     allowed_schemas = [
         getattr(Schema, x) for x in ("ECR_SCHEMA", "ECR_SCHEMA_PROD", "TEST_SCHEMA")
     ]
-    verifier_mode = os.environ.get("VERIFIER_ENV", "production")
+    verifier_mode = os.environ.get("VERIFIER_ENV", "test")
     trusted_leis = []
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "False").lower() in ("true", "1")
 
