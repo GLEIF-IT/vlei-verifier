@@ -120,39 +120,68 @@ def process_signature_headers(headers, req):
     Raises:
         SignatureHeaderError: If required headers are missing or invalid
     """
-    required_headers = ["SIGNATURE-INPUT", "SIGNATURE", "SIGNIFY-RESOURCE", "SIGNIFY-TIMESTAMP"]
-    if not all(h in headers for h in required_headers):
-        raise SignatureHeaderError("Missing required headers")
+    if (
+            "SIGNATURE-INPUT" not in headers
+            or "SIGNATURE" not in headers
+            or "SIGNIFY-RESOURCE" not in headers
+            or "SIGNIFY-TIMESTAMP" not in headers
+    ):
+        raise SignatureHeaderError(
+            json.dumps({"msg": "Incorrect Headers"}), 401
+        )
 
     siginput = headers["SIGNATURE-INPUT"]
-    sign = headers["SIGNATURE"]
+    signature = headers["SIGNATURE"]
+    resource = headers["SIGNIFY-RESOURCE"]
 
-    inputs = [i for i in ending.desiginput(siginput.encode("utf-8")) if i.name == "signify"]
+    inputs = ending.desiginput(siginput.encode("utf-8"))
+    inputs = [i for i in inputs if i.name == "signify"]
+
     if not inputs:
-        raise SignatureHeaderError("Invalid signature input")
+        raise SignatureHeaderError(
+            json.dumps({"msg": "Incorrect Headers"}), 401
+        )
 
-    items = []
     for inputage in inputs:
+        items = []
         for field in inputage.fields:
             if field.startswith("@"):
                 if field == "@method":
                     items.append(f'"{field}": {req.method}')
                 elif field == "@path":
-                    items.append(f'"{field}": {req.url}')
+                    items.append(f'"{field}": {req.path}')
+
             else:
                 key = field.upper()
-                if key in headers:
-                    items.append(f'"{field.lower()}": {ending.normalize(headers[key])}')
+                field = field.lower()
+                if key not in headers:
+                    continue
+
+                value = ending.normalize(headers[key])
+                items.append(f'"{field}": {value}')
 
         values = [f"({' '.join(inputage.fields)})", f"created={inputage.created}"]
-        for attr in ["expires", "nonce", "keyid", "context", "alg"]:
-            if getattr(inputage, attr) is not None:
-                values.append(f"{attr}={getattr(inputage, attr)}")
+        if inputage.expires is not None:
+            values.append(f"expires={inputage.expires}")
+        if inputage.nonce is not None:
+            values.append(f"nonce={inputage.nonce}")
+        if inputage.keyid is not None:
+            values.append(f"keyid={inputage.keyid}")
+        if inputage.context is not None:
+            values.append(f"context={inputage.context}")
+        if inputage.alg is not None:
+            values.append(f"alg={inputage.alg}")
 
-        items.append(f'"@signature-params: {";".join(values)}"')
+        params = ";".join(values)
 
-    encoded_data = "\n".join(items).encode("utf-8")
-    return sign, encoded_data
+        items.append(f'"@signature-params: {params}"')
+        ser = "\n".join(items)
+
+        signages = ending.designature(signature)
+        cig = signages[0].markers[inputage.name]
+
+        sig = cig.qb64
+        return sig, ser
 
 
 

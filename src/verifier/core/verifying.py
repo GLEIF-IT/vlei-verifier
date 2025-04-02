@@ -634,12 +634,12 @@ class AuthorizationResourceEnd:
         if env.mode == "production":
             headers = req.headers
             try:
-                sign, encoded_data = process_signature_headers(headers, req)
+                sign, data = process_signature_headers(headers, req)
             except SignatureHeaderError as e:
                 rep.status = falcon.HTTP_BAD_REQUEST
                 rep.data = json.dumps(dict(msg=str(e))).encode("utf-8")
                 return
-
+            encoded_data = data.encode("utf-8")
             verification_status, verification_message = verify_signed_headers(self.hby, aid, sign, encoded_data)
             if verification_status == SignatureVerificationStatus.UNAUTHORIZED:
                 rep.status = falcon.HTTP_UNAUTHORIZED
