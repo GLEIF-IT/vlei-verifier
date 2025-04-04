@@ -65,6 +65,8 @@ def loadEnds(app, hby, vdb, tvy, vry):
 
     healthEnd = HealthEndpoint()
     app.add_route("/health", healthEnd)
+    statusEnd = StatusEndpoint()
+    app.add_route("/service_status", statusEnd)
     credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
     stateHistEnd = StateHistoryResourceEndpoint(vdb)
     app.add_route("/presentations/history/{aid}", stateHistEnd)
@@ -883,6 +885,23 @@ class HealthEndpoint:
         rep.content_type = "application/json"
         rep.status = falcon.HTTP_OK
         rep.data = json.dumps(dict(msg="vLEI verification service is healthy")).encode(
+            "utf-8"
+        )
+        return
+
+
+class StatusEndpoint:
+    def __init__(self):
+        pass
+
+    def on_get(self, req, rep):
+        rep.content_type = "application/json"
+        rep.status = falcon.HTTP_OK
+        rep.data = json.dumps({
+            "status": "OK",
+            "mode": "verifier"
+        }
+        ).encode(
             "utf-8"
         )
         return
