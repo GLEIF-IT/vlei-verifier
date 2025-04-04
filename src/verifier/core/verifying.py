@@ -66,7 +66,7 @@ def loadEnds(app, hby, vdb, tvy, vry):
     healthEnd = HealthEndpoint()
     app.add_route("/health", healthEnd)
     statusEnd = StatusEndpoint()
-    app.add_route("/status", statusEnd)
+    app.add_route("/service_status", statusEnd)
     credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
     stateHistEnd = StateHistoryResourceEndpoint(vdb)
     app.add_route("/presentations/history/{aid}", stateHistEnd)
@@ -901,5 +901,7 @@ class StatusEndpoint:
             "status": "OK",
             "mode": "verifier"
         }
+        ).encode(
+            "utf-8"
         )
         return
