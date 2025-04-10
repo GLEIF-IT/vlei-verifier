@@ -359,10 +359,10 @@ class PresentationResourceEndpoint:
         saids = []
 
         if not self.vry.cues:
-            presentation_type = "AID"
             while self.hby.kvy.cues:
                 msg = self.hby.kvy.cues.popleft()
                 if "serder" in msg:
+                    presentation_type = "AID"
                     serder = msg["serder"]
                     if serder.sad.get("i") == said:
                         found = True
@@ -381,11 +381,14 @@ class PresentationResourceEndpoint:
             if not found:
                 info = f"Presented credential {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
                 print(info)
-                cred_state = CredProcessState(
-                    said=said, state=CRED_CRYPT_INVALID, info=info
-                )
-                self.vdb.iss.pin(keys=(said,), val=cred_state)
-                add_state_to_state_history(self.vdb, said, cred_state)
+
+                if not self.vdb.iss.get(keys=(said,)):
+                    cred_state = CredProcessState(
+                        said=said, state=CRED_CRYPT_INVALID, info=info
+                    )
+                    self.vdb.iss.pin(keys=(said,), val=cred_state)
+                    add_state_to_state_history(self.vdb, said, cred_state)
+
                 rep.status = falcon.HTTP_BAD_REQUEST
                 rep.data = json.dumps(
                     dict(
@@ -393,6 +396,8 @@ class PresentationResourceEndpoint:
                     )
                 ).encode("utf-8")
                 return
+
+
 
             saider = coring.Saider(qb64=said)
             cred_attrs = creder.sad["a"]
