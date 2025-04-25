@@ -343,6 +343,7 @@ class PresentationResourceEndpoint:
             return
 
         ims = req.bounded_stream.read()
+        witness_url = req.get_param("witness_url", default="http://localhost:5642")
 
         if len(self.vry.cues) > 0:
             rep.status = falcon.HTTP_SERVICE_UNAVAILABLE
@@ -384,7 +385,10 @@ class PresentationResourceEndpoint:
 
                 if not self.vdb.iss.get(keys=(said,)):
                     cred_state = CredProcessState(
-                        said=said, state=CRED_CRYPT_INVALID, info=info
+                        said=said, 
+                        state=CRED_CRYPT_INVALID, 
+                        info=info,
+                        witness_url=witness_url
                     )
                     self.vdb.iss.pin(keys=(said,), val=cred_state)
                     add_state_to_state_history(self.vdb, said, cred_state)
@@ -432,7 +436,13 @@ class PresentationResourceEndpoint:
 
                 info = f"Credential {said} presented for {aid} is cryptographically valid"
                 print(info)
-                cred_state = CredProcessState(said=said, state=CRED_CRYPT_VALID, info=info)
+                cred_state = CredProcessState(
+                    said=said,
+                    aid=aid,
+                    state=CRED_CRYPT_VALID, 
+                    info=info,
+                    witness_url=witness_url
+                )
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 self.vdb.iss.pin(keys=(said,), val=cred_state)
                 add_state_to_state_history(self.vdb, aid, cred_state)

@@ -21,6 +21,7 @@ from verifier.core.constants import Schema
 from verifier.core.resolve_env import VerifierEnvironment
 import datetime
 import json
+from verifier.core.observing import CredentialRevocationChecker
 
 
 parser = argparse.ArgumentParser(description='Launch vLEI Verification Service')
@@ -142,7 +143,7 @@ def launch(args):
     Mode can be set via VERIFIER_MODE environment variable:
     export VERIFIER_MODE=test|production
     """
-    verifier_mode = os.environ.get("VERIFIER_MODE", "production")
+    verifier_mode = os.environ.get("VERIFIER_MODE", "test")
     trusted_leis = config.get("trustedLeis", [])
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
 
@@ -186,7 +187,10 @@ def launch(args):
     reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
     authDoers = authorizing.setup(hby, vdb=vdb, reger=reger)
 
-    doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer]
+    # Initialize the credential revocation checker doer
+    revocation_checker = CredentialRevocationChecker(hby=hby, vdb=vdb, reger=reger)
+
+    doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer, revocation_checker]
 
     print(f"vLEI Verification Service running and listening on: {httpPort}")
     return doers

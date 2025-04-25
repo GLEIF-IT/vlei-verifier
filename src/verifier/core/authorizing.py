@@ -106,13 +106,15 @@ class Authorizer:
             now = helping.nowUTC()
             age = now - datetime.datetime.fromisoformat(state.date)
             cred_state = None
+            cur_state = self.vdb.iss.get(keys=(aid,))
+
             if state.state == AUTH_EXPIRE and age > datetime.timedelta(seconds=self.TimeoutAuth * 2):
                 self.vdb.iss.rem(keys=(aid,))
             # We keep revoked credentials in the DB because their auth should never expire and the state
             # must always be AUTH_REVOKED to avoid logging in again with the older version of the credential
             elif state.state != AUTH_REVOKED and state.state != AUTH_EXPIRE and age > datetime.timedelta(
                     seconds=self.TimeoutAuth):
-                cred_state = CredProcessState(said=state.said, state=AUTH_EXPIRE,
+                cred_state = CredProcessState(aid=cur_state.aid, said=state.said, state=AUTH_EXPIRE,
                                               info=f"Cred state exceeded {self.TimeoutAuth}")
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 add_state_to_state_history(self.vdb, aid, cred_state)
@@ -130,13 +132,13 @@ class Authorizer:
                 # are there multiple creds for the same said?
                 passed_cred_filters, info = self.cred_filters(creder)
                 if passed_cred_filters:
-                    cred_state = CredProcessState(said=state.said, state=AUTH_SUCCESS, info=info,
+                    cred_state = CredProcessState(aid=cur_state.aid, said=state.said, state=AUTH_SUCCESS, info=info,
                                                   role=creder.attrib["engagementContextRole"] or creder.attrib[
-                                                      "officialRole"])
+                                                      "officialRole"], witness_url=state.witness_url)
                     acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
                     self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
                 else:
-                    cred_state = CredProcessState(said=state.said, state=AUTH_FAIL, info=info)
+                    cred_state = CredProcessState(aid=cur_state.aid, said=state.said, state=AUTH_FAIL, info=info, witness_url=state.witness_url)
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 add_state_to_state_history(self.vdb, aid, cred_state)
 
