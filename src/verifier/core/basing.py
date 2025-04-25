@@ -38,9 +38,11 @@ AID_AUTH_FAIL = "AID unauthorized"
 @dataclass
 class CredProcessState:
     said: Optional[str] = None
+    aid: Optional[str] = None
     state: Optional[str] = None
     info: Optional[str] = None
     role: Optional[str] = None
+    witness_url: Optional[str] = None
     date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
     def __iter__(self):

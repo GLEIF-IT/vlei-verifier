@@ -33,7 +33,7 @@ from setuptools import setup
 
 setup(
     name='verifier',
-    version='0.1.2',  # also change in src/verifier/__init__.py
+    version='0.1.3',  # also change in src/verifier/__init__.py
     license='Apache Software License 2.0',
     description='Verifier: Proof of Concept vLEI Verifier',
     long_description="Verifier: Proof of Concept vLEI Verifier.",
