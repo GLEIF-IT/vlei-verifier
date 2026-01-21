@@ -557,4 +557,4 @@ def test_ecr_newschema(seeder):
         # ecr auth cred is verified to be a valid credential
         assert result.status == falcon.HTTP_202
 
-        assert result.json.get('msg') == f"{cred_value} for {hab.pre} as issuee is Credential cryptographically valid"
+        assert result.json.get('msg') == f"Credential {cred_value} presented for {hab.pre} is cryptographically valid"

@@ -1,5 +1,5 @@
 services:
-  # witnesses:
+  #  witnesses:
   #   # container_name: witnesshost
   #   # hostname: witnesshost
   #   image: weboftrust/keri:latest
@@ -31,13 +31,11 @@ services:
     image: gleif/vlei-verifier:latest
     container_name: vlei-verifier
     hostname: vlei-verifier
-    # depends_on:
-    #   - vlei
-    #   - witnesses
     ports:
       - 7676:7676
     environment:
       - VERIFIER_CONFIG_FILE=verifier-config-public.json
+      - VERIFY_ROOT_OF_TRUST=True
     healthcheck:
       test:
           - CMD

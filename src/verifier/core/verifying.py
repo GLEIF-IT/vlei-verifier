@@ -358,7 +358,7 @@ class PresentationResourceEndpoint:
         found = False
         presentation_type: PresentationType = "CREDENTIAL"
         saids = []
-
+        aid = None
         if not self.vry.cues:
             while self.hby.kvy.cues:
                 msg = self.hby.kvy.cues.popleft()
@@ -374,6 +374,11 @@ class PresentationResourceEndpoint:
             if "creder" in msg:
                 creder = msg["creder"]
                 if creder.said == said:
+                    creder_attrs = creder.sad['a']
+                    if 'i' in creder_attrs:
+                        aid = creder_attrs['i']
+                    else:
+                        aid = creder.sad['i']
                     found = True
                     break
 
@@ -401,7 +406,26 @@ class PresentationResourceEndpoint:
                 ).encode("utf-8")
                 return
 
-
+            # Signed headers verification
+            env = VerifierEnvironment.resolve_env()
+            if env.mode == "production":
+                headers = req.headers
+                try:
+                    sign, data = process_signature_headers(headers, req)
+                except SignatureHeaderError as e:
+                    rep.status = falcon.HTTP_BAD_REQUEST
+                    rep.data = json.dumps(dict(msg=str(e))).encode("utf-8")
+                    return
+                encoded_data = data.encode("utf-8")
+                verification_status, verification_message = verify_signed_headers(self.hby, aid, sign, encoded_data)
+                if verification_status == SignatureVerificationStatus.UNAUTHORIZED:
+                    rep.status = falcon.HTTP_UNAUTHORIZED
+                    rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
+                    return
+                if verification_status == SignatureVerificationStatus.BAD_SIGNATURE:
+                    rep.status = falcon.HTTP_BAD_REQUEST
+                    rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
+                    return
 
             saider = coring.Saider(qb64=said)
             cred_attrs = creder.sad["a"]
@@ -453,7 +477,7 @@ class PresentationResourceEndpoint:
                     dict(
                         creds=json.dumps(creds),
                         aid=aid,
-                        msg=f"{said} for {aid} as {type} is {cred_state.state}",
+                        msg=info,
                     )
                 ).encode("utf-8")
             else:
