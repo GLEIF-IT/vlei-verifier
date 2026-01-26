@@ -59,7 +59,7 @@ class CredentialRevocationChecker(doing.Doer):
                             if env.mode == "production":
                                 self.vdb.iss.rem(keys=(aid,))  
                                 self.vdb.iss.rem(keys=(state.said,))  
-                                self.vdb.acct.rem(keys=(aid,))  
+                                self.vdb.accts.rem(keys=(aid,))
                     continue
                 except Exception as e:
                     print(f"Error checking witness for credential {state.said}: {e}")
@@ -70,7 +70,7 @@ class CredentialRevocationChecker(doing.Doer):
                 if env.mode == "production":
                     self.vdb.iss.rem(keys=(aid,))
                     self.vdb.iss.rem(keys=(state.said,))
-                    self.vdb.acct.rem(keys=(aid,))
+                    self.vdb.accts.rem(keys=(aid,))
 
 
             
