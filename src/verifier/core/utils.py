@@ -270,7 +270,7 @@ def process_signature_headers(headers, req):
             or "SIGNIFY-TIMESTAMP" not in headers
     ):
         raise SignatureHeaderError(
-            json.dumps({"msg": "Incorrect Headers"}), 401
+            "Incorrect Signature Headers"
         )
 
     siginput = headers["SIGNATURE-INPUT"]
@@ -282,7 +282,7 @@ def process_signature_headers(headers, req):
 
     if not inputs:
         raise SignatureHeaderError(
-            json.dumps({"msg": "Incorrect Headers"}), 401
+            "Incorrect Signature Headers"
         )
 
     for inputage in inputs:
@@ -325,6 +325,7 @@ def process_signature_headers(headers, req):
 
         sig = cig.qb64
         return sig, ser
+    return None
 
 
 def verify_signed_headers(hby, aid, signature, encoded_data) -> tuple[SignatureVerificationStatus, str]:
