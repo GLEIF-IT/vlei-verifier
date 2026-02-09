@@ -22,6 +22,7 @@ import datetime
 CRED_CRYPT_INVALID = "Credential cryptographically invalid"
 CRED_CRYPT_VALID = "Credential cryptographically valid"
 CRED_AGE_OFF = "Credential presentation has aged off"
+OBSERVER_REVOCATION_CHECK_FAILED = "Credential revocation check failed"
 AUTH_REVOKED = "Credential revoked"
 AUTH_PENDING = "Credential pending authorization"
 AUTH_SUCCESS = "Credential authorized"

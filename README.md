@@ -83,6 +83,7 @@ You can customize the service behavior using these configuration options:
 - **`iurls`**: - OOBI URLs
 - **`durls`**: - Schema OOBI URLs
 - **`trustedLeis`**: A list of trusted LE identifiers.
+- **`revocationCheck`**: Boolean. True means enable credential revocation checks
 - **`allowedSchemas`**: A list of schemas allowed for authorization.
 
 ### Default Configuration

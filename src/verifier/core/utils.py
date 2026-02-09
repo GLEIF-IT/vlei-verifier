@@ -379,16 +379,17 @@ def parse_cesr(cesr: str) -> Optional[List[Dict[str, Any]]]:
         Optional[List[Dict[str, Any]]]: A list of dictionaries containing 'signature' and 'json' keys,
                                         or None if the CESR string is invalid
     """
-    # Extract signatures using regex
-    signature_regex = r'(?<=})(-.*?)(?={|$)'
-    signatures = re.findall(signature_regex, cesr)
-    
-    # Replace signatures with commas to create a valid JSON array
-    json_string = f"[{re.sub(signature_regex, ',', cesr).strip()}]"
-    # Remove trailing comma if present
-    json_string = re.sub(r',(?=[^,]*$)', '', json_string)
+
     
     try:
+        # Extract signatures using regex
+        signature_regex = r'(?<=})(-.*?)(?={|$)'
+        signatures = re.findall(signature_regex, cesr)
+
+        # Replace signatures with commas to create a valid JSON array
+        json_string = f"[{re.sub(signature_regex, ',', cesr).strip()}]"
+        # Remove trailing comma if present
+        json_string = re.sub(r',(?=[^,]*$)', '', json_string)
         parsed_json = json.loads(json_string)
     except json.JSONDecodeError as error:
         print(f"Invalid JSON: {error}")

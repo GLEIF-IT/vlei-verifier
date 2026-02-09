@@ -144,14 +144,16 @@ def launch(args):
     export VERIFIER_MODE=test|production
     """
     verifier_mode = os.environ.get("VERIFIER_MODE", "test")
-    trusted_leis = config.get("trustedLeis", [])
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
+    trusted_leis = config.get("trustedLeis", [])
+    revocation_check = config.get("revocationCheck", False)
 
     ve_init_params = {
         "configuration": cf,
         "mode": verifier_mode,
         "trustedLeis": trusted_leis if trusted_leis else [],
         "verifyRootOfTrust": verify_rot,
+        "revocationCheck": revocation_check
     }
 
     print("ALLOWED", allowed_schemas)
@@ -187,10 +189,12 @@ def launch(args):
     reportDoers = reporting.setup(app=app, hby=hby, vdb=vdb)
     authDoers = authorizing.setup(hby, vdb=vdb, reger=reger)
 
-    # Initialize the credential revocation checker doer
-    revocation_checker = CredentialRevocationChecker(hby=hby, vdb=vdb, reger=reger)
-
-    doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer, revocation_checker]
+    # Initialize the credential revocation checker doer if revocationCheck is True
+    if ve.revocationCheck is True:
+        revocation_checker = CredentialRevocationChecker(hby=hby, vdb=vdb, reger=reger)
+        doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer, revocation_checker]
+    else:
+        doers = obl.doers + authDoers + reportDoers + [hbyDoer, httpServerDoer]
 
     print(f"vLEI Verification Service running and listening on: {httpPort}")
     return doers

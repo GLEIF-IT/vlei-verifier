@@ -13,6 +13,7 @@ class VerifierEnvironment:
     trustedLeis: List[str] = field(default_factory=list)
     mode: str = "production"
     verifyRootOfTrust: bool = True
+    revocationCheck: bool = True
     authAllowedSchemas: List = field(default_factory=lambda: [])
 
     _instance: "VerifierEnvironment" = None

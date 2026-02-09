@@ -1,7 +1,7 @@
 import requests
 
 from hio.base import doing
-from verifier.core.basing import CredProcessState, AUTH_REVOKED
+from verifier.core.basing import CredProcessState, AUTH_REVOKED, OBSERVER_REVOCATION_CHECK_FAILED
 from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.utils import add_state_to_state_history, process_revocations_from_event_log, parse_cesr
 from keri.vdr import verifying, eventing
@@ -34,14 +34,29 @@ class CredentialRevocationChecker(doing.Doer):
             self._check_revocations()
             self.lastCheck = tyme
         return False
+
+    def _mark_as_revocation_check_failed(self, said: str, reason: str):
+        cur_state: CredProcessState = self.vdb.iss.get(keys=(said,))
+        aid = cur_state.aid
+        if aid:
+            cur_state: CredProcessState = self.vdb.iss.get(keys=(aid,))
+        rev_state = CredProcessState(aid=aid, said=said, info=reason, state=OBSERVER_REVOCATION_CHECK_FAILED,
+                                     witness_url=cur_state.witness_url)
+        self.vdb.iss.pin(keys=(aid,), val=rev_state)
+        self.vdb.iss.pin(keys=(said,), val=rev_state)
+        self.vdb.accts.rem(keys=(aid,))
+        add_state_to_state_history(self.vdb, aid, rev_state)
             
     def _check_revocations(self):
         """Check revocation status for all credentials in the database."""
+        env = VerifierEnvironment.resolve_env()
+        if env.revocationCheck is False:
+            return
+
         # Get all credentials from the database
         for (aid,), state in self.vdb.iss.getItemIter():
-            if state.state == AUTH_REVOKED:
+            if state.state == AUTH_REVOKED or state.state == OBSERVER_REVOCATION_CHECK_FAILED:
                 continue
-            env = VerifierEnvironment.resolve_env()
 
             # If witness URL is provided, check with the witness
             if state.witness_url:
@@ -53,25 +68,21 @@ class CredentialRevocationChecker(doing.Doer):
                         if parsed_cesr: 
                             process_revocations_from_event_log(self.vdb, state.said, parsed_cesr)
                         else:
-                            print(f"No CESR found for credential {state.said}")
-                            # Remove credential and associated data from database in production mode
-                            # This ensures we don't keep invalid credentials
-                            if env.mode == "production":
-                                self.vdb.iss.rem(keys=(aid,))  
-                                self.vdb.iss.rem(keys=(state.said,))  
-                                self.vdb.accts.rem(keys=(aid,))
+                            reason = f"No valid CESR found for credential {state.said}"
+                            print(reason)
+                            self._mark_as_revocation_check_failed(state.said, reason)
                     continue
+                except requests.exceptions.ConnectionError as e:
+                    reason = f"Error checking witness for credential {state.said}: Witness {state.witness_url} is unavailable"
+                    print(reason)
+                    self._mark_as_revocation_check_failed(state.said, reason)
                 except Exception as e:
-                    print(f"Error checking witness for credential {state.said}: {e}")
+                    reason = f"Error checking witness for credential {state.said}: unexpected error"
+                    print(reason)
+                    self._mark_as_revocation_check_failed(state.said, reason)
+
             else:
                 print(f"No witness URL provided for credential {state.said}")
-                # Remove credential and associated data from database in production mode
-                # This ensures we don't keep invalid credentials
-                if env.mode == "production":
-                    self.vdb.iss.rem(keys=(aid,))
-                    self.vdb.iss.rem(keys=(state.said,))
-                    self.vdb.accts.rem(keys=(aid,))
-
-
-            
+                reason = f"No witness URL provided for credential {state.said}"
+                self._mark_as_revocation_check_failed(state.said, reason)
 
