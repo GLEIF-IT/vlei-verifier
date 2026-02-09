@@ -16,7 +16,7 @@ from keri.core import coring
 from keri.help import helping
 
 from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED, AUTH_PENDING, AUTH_SUCCESS, AUTH_EXPIRE, \
-    AUTH_FAIL, CRED_CRYPT_VALID, AID_CRYPT_VALID, AidProcessState, AID_AUTH_SUCCESS
+    AUTH_FAIL, CRED_CRYPT_VALID, AID_CRYPT_VALID, AidProcessState, AID_AUTH_SUCCESS, OBSERVER_REVOCATION_CHECK_FAILED
 from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
 from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.utils import add_state_to_state_history
@@ -112,7 +112,7 @@ class Authorizer:
                 self.vdb.iss.rem(keys=(aid,))
             # We keep revoked credentials in the DB because their auth should never expire and the state
             # must always be AUTH_REVOKED to avoid logging in again with the older version of the credential
-            elif state.state != AUTH_REVOKED and state.state != AUTH_EXPIRE and age > datetime.timedelta(
+            elif state.state != AUTH_REVOKED and state.state != OBSERVER_REVOCATION_CHECK_FAILED and state.state != AUTH_EXPIRE and age > datetime.timedelta(
                     seconds=self.TimeoutAuth):
                 cred_state = CredProcessState(aid=cur_state.aid, said=state.said, state=AUTH_EXPIRE,
                                               info=f"Cred state exceeded {self.TimeoutAuth}")

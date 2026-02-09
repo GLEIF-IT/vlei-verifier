@@ -7,6 +7,7 @@ import json
 from keri import kering
 from keri.core import coring, parsing, Siger
 from keri.vdr import verifying, eventing
+from pygments.lexer import default
 
 from verifier.core.authorizing import AUTH_EXPIRE
 from verifier.core.basing import (
@@ -343,7 +344,8 @@ class PresentationResourceEndpoint:
             return
 
         ims = req.bounded_stream.read()
-        witness_url = req.get_param("witness_url", default="http://localhost:5642")
+        # Should the `witness_url` parameter be mandatory?
+        witness_url = req.get_param("witness_url", default=None)
 
         if len(self.vry.cues) > 0:
             rep.status = falcon.HTTP_SERVICE_UNAVAILABLE
