@@ -42,7 +42,8 @@ class CredentialRevocationChecker(doing.Doer):
             cur_state: CredProcessState = self.vdb.iss.get(keys=(aid,))
         rev_state = CredProcessState(aid=aid, said=said, info=reason, state=OBSERVER_REVOCATION_CHECK_FAILED,
                                      witness_url=cur_state.witness_url)
-        self.vdb.iss.pin(keys=(aid,), val=rev_state)
+        if self.vdb.iss.get(keys=(aid,)):
+            self.vdb.iss.pin(keys=(aid,), val=rev_state)
         self.vdb.iss.pin(keys=(said,), val=rev_state)
         self.vdb.accts.rem(keys=(aid,))
         add_state_to_state_history(self.vdb, aid, rev_state)
