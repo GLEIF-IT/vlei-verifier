@@ -77,6 +77,7 @@ setup(
         'keri==1.2.6',
         'mnemonic>=0.20',
         'pysodium>=0.7.17',
+        'pygments>=2.19.2',
         'multicommand>=1.0.0',
         'falcon>=3.1.0',
         'http_sfv>=0.9.8',
