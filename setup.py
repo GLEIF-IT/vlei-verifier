@@ -74,7 +74,7 @@ setup(
     ],
     python_requires='>=3.12.2',
     install_requires=[
-        'keri==1.2.6',
+        'keri==1.2.12',
         'mnemonic>=0.20',
         'pysodium>=0.7.17',
         'pygments>=2.19.2',

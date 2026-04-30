@@ -13,6 +13,17 @@ from verifier import __version__
 help.ogler.level = logging.DEBUG
 help.ogler.reopen(name="verifer", temp=True, clear=True)
 
+
+def silence_external_console_logs():
+    """Prevent noisy dependency logs from reaching stdout/stderr."""
+    for logger_name in ("keri", "hio"):
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.CRITICAL)
+        logger.propagate = False
+
+
+# silence_external_console_logs()
+
 from keri.app import directing
 
 from verifier.app.cli import commands

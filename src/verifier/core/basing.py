@@ -111,6 +111,16 @@ class ReportStats:
     message: str = ""
 
 
+@dataclass
+class SeenEvent:
+    """ Seen events dataclass for tracking"""
+    said: str = None
+    event_type: str = None
+    date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    def __iter__(self):
+        return iter(asdict(self).values())
+
+
 # Report Statuses.
 Reportage = namedtuple("Reportage", "accepted verified failed")
 
@@ -179,7 +189,7 @@ class VerifierBaser(dbing.LMDBer):
     TempPrefix = "keri_vdb_"
     KERIBaserMapSizeKey = "KERI_BASER_MAP_SIZE"
 
-    def __init__(self, name="vdb", headDirPath=None, reopen=True, **kwa):
+    def __init__(self, name="vdb", headDirPath=None, reopen=True, temp=False, **kwa):
         """  Create verifier database
 
         Parameters:
@@ -207,6 +217,9 @@ class VerifierBaser(dbing.LMDBer):
         # Komer instance of ReportStats data class, keyed by SAID
         self.stats = None
 
+        # Seen events database
+        self.sevts = None
+
         if (mapSize := os.getenv(self.KERIBaserMapSizeKey)) is not None:
             try:
                 self.MapSize = int(mapSize)
@@ -214,7 +227,7 @@ class VerifierBaser(dbing.LMDBer):
                 print("KERI_BASER_MAP_SIZE must be an integer value >1!")
                 raise
 
-        super(VerifierBaser, self).__init__(name=name, headDirPath=headDirPath, reopen=reopen, **kwa)
+        super(VerifierBaser, self).__init__(name=name, headDirPath=headDirPath, reopen=reopen, temp=temp, **kwa)
 
     def reopen(self, **kwa):
         """  Opens database environment and initializes all sub-dbs
@@ -251,6 +264,9 @@ class VerifierBaser(dbing.LMDBer):
 
         # Report DIGs indexed by status
         self.stts = koming.Komer(db=self, subkey='stts.', schema=UploadStatus)
+
+        # Seen events database
+        self.sevts = koming.Komer(db=self, subkey='seen_events.', schema=SeenEvent)
 
         # Data chunks for uploaded report, indexed by DIG plus chunk index
         self.imgs = self.env.open_db(key=b'imgs.')

@@ -1,5 +1,6 @@
 import datetime
 import os
+import time
 from typing import Literal
 
 import falcon
@@ -22,9 +23,9 @@ from verifier.core.basing import (
     AUTH_FAIL, AidProcessState, AID_CRYPT_INVALID, AID_CRYPT_VALID, Account
 )
 from verifier.core.resolve_env import VerifierEnvironment
-from verifier.core.utils import process_revocations, add_root_of_trust, add_oobi, DigerBuilder, \
+from verifier.core.utils import parse_cesr, build_cesr_from_parsed_json, process_revocations, add_root_of_trust, add_oobi, DigerBuilder, \
     add_state_to_state_history, get_state_to_state_history, verify_signed_headers, SignatureVerificationStatus, \
-    process_signature_headers, SignatureHeaderError
+    process_signature_headers, SignatureHeaderError, add_seen_event, remove_seen_events
 
 PresentationType = Literal["AID", "CREDENTIAL"]
 
@@ -342,8 +343,11 @@ class PresentationResourceEndpoint:
                 dict(msg=f"invalid content type={req.content_type} for VC presentation")
             ).encode("utf-8")
             return
-
+        
+        start_time = time.time()
         ims = req.bounded_stream.read()
+        end_time = time.time()
+        print(f"Time taken to read the request: {end_time - start_time} seconds")
         # Should the `witness_url` parameter be mandatory?
         witness_url = req.get_param("witness_url", default=None)
 
@@ -354,13 +358,24 @@ class PresentationResourceEndpoint:
                     msg=f"Verifier is busy processing another VC presentation, try credential {said} presentation again later"
                 )
             ).encode("utf-8")
+        # Remove seen events from the CESR message
+        cesr = remove_seen_events(self.vdb, ims, said)
+        parsed_cesr = parse_cesr(cesr.decode("utf-8"))
 
-        parsing.Parser().parse(ims=ims, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
+        print("Starting to parse the CESR message")
+        start_time = time.time()
+        # Parse the CESR message with the seen events removed
+        parsing.Parser().parse(ims=cesr, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
 
+        # Parse the original CESR message with the seen events included
+        # parsing.Parser().parse(ims=ims, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
+        end_time = time.time()
+        print(f"Time taken to parse credential CESR: {end_time - start_time} seconds")
         found = False
         presentation_type: PresentationType = "CREDENTIAL"
         saids = []
         aid = None
+        start_time = time.time()
         if not self.vry.cues:
             while self.hby.kvy.cues:
                 msg = self.hby.kvy.cues.popleft()
@@ -370,7 +385,9 @@ class PresentationResourceEndpoint:
                     if serder.sad.get("i") == said:
                         found = True
             self.hby.kvy.cues.clear()
-
+        end_time = time.time()
+        print(f"Time taken to process the AID cue: {end_time - start_time} seconds")    
+        start_time = time.time()
         while self.vry.cues:
             msg = self.vry.cues.popleft()
             if "creder" in msg:
@@ -384,6 +401,8 @@ class PresentationResourceEndpoint:
                     found = True
                     break
 
+        end_time = time.time()
+        print(f"Time taken to process the credential cue: {end_time - start_time} seconds")
         self.vry.cues.clear()
         if presentation_type == "CREDENTIAL":
             if not found:
@@ -472,6 +491,9 @@ class PresentationResourceEndpoint:
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 self.vdb.iss.pin(keys=(said,), val=cred_state)
                 add_state_to_state_history(self.vdb, aid, cred_state)
+
+                for event in parsed_cesr:
+                    add_seen_event(self.vdb, event.get("said"), event.get("json").get("t"))
                 # Here we need to check if the credential was revoked and if so we update it's state to AUTH_REVOKED
                 process_revocations(self.vdb, creds, said)
                 rep.status = falcon.HTTP_ACCEPTED
