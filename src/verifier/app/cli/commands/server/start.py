@@ -6,6 +6,9 @@ Verification service main command line handler.  Starts service using the provid
 
 """
 import argparse
+import datetime
+import json
+import logging
 import os
 import re
 
@@ -15,12 +18,9 @@ from keri import help
 from keri.app import keeping, configing, habbing, oobiing
 from keri.app.cli.common import existing
 from keri.vdr import viring
-import logging
 from verifier.core import verifying, authorizing, basing, reporting
 from verifier.core.constants import Schema
 from verifier.core.resolve_env import VerifierEnvironment
-import datetime
-import json
 from verifier.core.observing import CredentialRevocationChecker
 
 
@@ -52,6 +52,14 @@ parser.add_argument('--config-file',
 
 #
 dev_only_endpoints = list(filter(None, os.environ.get('DEV_ONLY_ENDPOINTS', "").split(",")))
+
+
+def silence_external_console_logs():
+    """Prevent noisy dependency logs from reaching stdout/stderr."""
+    for logger_name in ("keri", "hio"):
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.CRITICAL)
+        logger.propagate = False
 
 
 class EnvironmentMiddleware:
@@ -121,7 +129,8 @@ def launch(args):
                             reopen=True,
                             clear=False)
 
-    help.ogler.level = logging.DEBUG
+    help.ogler.level = logging.ERROR
+    silence_external_console_logs()
     config = cf.get()
     allowed_schemas = [
         getattr(Schema, x) for x in config.get("allowedSchemas", []) if getattr(Schema, x, None)
@@ -161,16 +170,13 @@ def launch(args):
         ve_init_params["authAllowedSchemas"] = allowed_schemas
 
     ve = VerifierEnvironment.initialize(**ve_init_params)
-    if aeid is None:
-        hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf)
-    else:
-        hby = existing.setupHby(name=name, base=base, bran=bran)
+    hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf, temp=True)
 
     hbyDoer = habbing.HaberyDoer(habery=hby)  # setup doer
     obl = oobiing.Oobiery(hby=hby)
 
     reger = viring.Reger(name=hby.name, temp=hby.temp)
-    vdb = basing.VerifierBaser(name=hby.name)
+    vdb = basing.VerifierBaser(name=hby.name, temp=True)
     cors_middleware = falcon.CORSMiddleware(
         allow_origins='*',
         allow_credentials='*',

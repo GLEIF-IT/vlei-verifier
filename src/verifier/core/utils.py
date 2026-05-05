@@ -7,7 +7,7 @@ from keri import kering
 from keri.core import MtrDex, coring, parsing
 import keri.help.helping as help
 from keri.db import basing
-from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust, AidProcessState, StateHistory
+from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust, AidProcessState, StateHistory, SeenEvent
 from enum import Enum
 from keri.end import ending
 
@@ -401,7 +401,69 @@ def parse_cesr(cesr: str) -> Optional[List[Dict[str, Any]]]:
         if i < len(signatures):
             parsed_cesr.append({
                 "signature": signatures[i],
+                "said": json_item.get("d"),
                 "json": json_item
             })
     
     return parsed_cesr
+
+
+def build_cesr_from_parsed_json(parsed_json: List[Dict[str, Any]]):
+    """Build a CESR string from a list of JSON objects.
+    
+    This function builds a CESR string from a list of JSON objects.
+    JSON segments use compact serialization (no spaces after `,` or `:`) so the
+    byte layout matches CESR, which forbids structural whitespace while still
+    allowing spaces inside string values. Signature segments are raw CESR text,
+    not JSON-encoded strings.
+
+    Args:
+        parsed_json (List[Dict[str, Any]]): The list of JSON objects to build the CESR string from
+
+    Returns:
+        str: The CESR string
+    """
+    def _cesr_json(obj: Any) -> str:
+        return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
+    return "".join(
+        f"{_cesr_json(item.get('json'))}{item.get('signature') or ''}"
+        for item in parsed_json
+    )
+
+
+def remove_seen_events(vdb, ims: bytes, said: str):
+    """Remove seen events from a list of JSON objects.
+    
+    This function removes seen events from a list of JSON objects.
+    
+    Args:
+        vdb (VerifierBaser): The verifier database
+        ims (bytes): The CESR message to remove seen events from
+        said (str): The SAID of the credential that was seen
+    """
+    parsed_cesr = parse_cesr(ims.decode("utf-8"))
+    clean_parsed_cesr = []
+    for cesr_event in parsed_cesr:
+        # If the event has been seen and is not the current credential and is not the issuee, skip it
+        if vdb.sevts.get(keys=(cesr_event.get("said"),)) and cesr_event.get("said") != said and cesr_event.get("json").get("i") != said:
+            continue
+        clean_parsed_cesr.append(cesr_event)
+    cesr = build_cesr_from_parsed_json(clean_parsed_cesr)
+    cesr = bytes(cesr, "utf-8")
+    return cesr
+
+
+def add_seen_event(vdb, said: str, event_type: str):
+    """Add a seen event to the seen events database.
+    
+    This function adds a seen event to the seen events database.
+    
+    Args:
+        vdb (VerifierBaser): The verifier database
+        said (str): The SAID of the credential that was seen
+        event_type (str): The type of event that was seen
+    """
+    seen_event = SeenEvent(said=said, event_type=event_type)
+    vdb.sevts.pin(keys=(said,), val=seen_event)
+    return seen_event
