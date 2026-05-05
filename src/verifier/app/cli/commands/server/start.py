@@ -129,8 +129,8 @@ def launch(args):
                             reopen=True,
                             clear=False)
 
-    help.ogler.level = logging.DEBUG
-    # silence_external_console_logs()
+    help.ogler.level = logging.ERROR
+    silence_external_console_logs()
     config = cf.get()
     allowed_schemas = [
         getattr(Schema, x) for x in config.get("allowedSchemas", []) if getattr(Schema, x, None)

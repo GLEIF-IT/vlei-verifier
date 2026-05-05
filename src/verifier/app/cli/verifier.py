@@ -10,7 +10,7 @@ import logging
 from keri import help
 from verifier import __version__
 
-help.ogler.level = logging.DEBUG
+help.ogler.level = logging.ERROR
 help.ogler.reopen(name="verifer", temp=True, clear=True)
 
 
