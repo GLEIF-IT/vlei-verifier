@@ -1,13 +1,30 @@
+import hashlib
 import json
+import logging
+import os
 import time
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+from urllib.parse import urlparse
 
 from keri import kering
 from keri.core import MtrDex, coring, parsing
 import keri.help.helping as help
 from keri.db import basing
-from verifier.core.basing import AUTH_REVOKED, CredProcessState, RootOfTrust, AidProcessState, StateHistory, SeenEvent
+from verifier.core.basing import (
+    AUTH_REVOKED,
+    AUTH_FAIL,
+    AUTH_PENDING,
+    AUTH_SUCCESS,
+    CRED_CRYPT_VALID,
+    CredProcessState,
+    RootOfTrust,
+    AidProcessState,
+    StateHistory,
+    SeenEvent,
+    UsedSignifySignature,
+    OBSERVER_REVOCATION_CHECK_FAILED,
+)
 from enum import Enum
 from keri.end import ending
 
@@ -19,6 +36,11 @@ class SignatureHeaderError(Exception):
     in a request. It includes a JSON-formatted error message and an HTTP status code.
     """
     pass
+
+
+logger = logging.getLogger(__name__)
+
+SIGNIFY_MAX_CLOCK_SKEW_SEC = int(os.getenv("VERIFIER_SIGNIFY_MAX_SKEW_SEC", "100000"))
 
 
 class SignatureVerificationStatus(Enum):
@@ -117,6 +139,82 @@ def process_revocations(vdb, creds, said):
                 vdb.iss.pin(keys=(said,), val=rev_state)
                 vdb.accts.rem(keys=(aid,))
                 add_state_to_state_history(vdb, aid, rev_state)
+
+def validate_witness_url(
+    witness_url: Optional[str],
+    allowlist: Optional[List[str]] = None,
+    mode: str = "production",
+) -> Tuple[bool, str]:
+    """Validate a client-supplied witness base URL against policy.
+
+    In test mode, or when allowlist is empty, any http(s) URL is accepted.
+    In production with a non-empty allowlist, the host must match an entry.
+    """
+    if not witness_url:
+        return True, ""
+
+    parsed = urlparse(witness_url.strip())
+    if parsed.scheme not in ("http", "https"):
+        return False, "witness_url must use http or https"
+    if not parsed.netloc:
+        return False, "witness_url must include a host"
+
+    if mode == "test" or not allowlist:
+        return True, ""
+
+    host = parsed.hostname
+    base = witness_url.rstrip("/")
+    for entry in allowlist:
+        entry = entry.strip()
+        if not entry:
+            continue
+        entry_lower = entry.lower()
+        if base.startswith(entry) or base.startswith(entry_lower):
+            return True, ""
+        entry_host = urlparse(entry if "://" in entry else f"https://{entry}").netloc.lower()
+        if entry_host and (host == entry_host or host.endswith(f".{entry_host}")):
+            return True, ""
+
+    return False, f"witness_url host {parsed.netloc} is not in the configured allowlist"
+
+
+def _validate_signify_window(signify_input) -> Tuple[bool, str]:
+    """Check created timestamp on a Signify signature-input."""
+    now = int(time.time())
+    created = getattr(signify_input, "created", None)
+
+    if created is not None:
+        try:
+            created_int = int(created)
+        except (TypeError, ValueError):
+            return False, "signature created timestamp is invalid"
+        if abs(now - created_int) > SIGNIFY_MAX_CLOCK_SKEW_SEC:
+            return False, "signature created timestamp outside allowed window"    
+
+    return True, ""
+
+
+def _check_signify_signature_replay(vdb, signify_signature: str) -> Tuple[bool, str]:
+    """Reject replayed Signify signatures."""
+    if not signify_signature:
+        return True, ""
+
+    if vdb.used_sigs.get(keys=(signify_signature,)):
+        return False, "signify signature has already been used"
+
+    return True, ""
+
+
+def _record_signify_signature(vdb, aid: str, signify_signature: str) -> None:
+    """Record a Signify signature after successful cryptographic verification."""
+    if not signify_signature:
+        return
+
+    vdb.used_sigs.pin(
+        keys=(signify_signature,),
+        val=UsedSignifySignature(signify=signify_signature, aid=aid),
+    )
+
 
 def process_revocations_from_event_log(vdb, said, events):
     """Process revocations from an event log.
@@ -257,8 +355,8 @@ def process_signature_headers(headers, req):
         req (Request): Request object
         
     Returns:
-        tuple: (signature, encoded_data) where signature is the qb64-encoded signature
-               and encoded_data is the data that was signed
+        tuple: (signify_signature, encoded_data, signify_input) where signify_signature
+               is the qb64 Cigar from the "signify" marker in the Signature header
         
     Raises:
         SignatureHeaderError: If required headers are missing or invalid
@@ -323,12 +421,20 @@ def process_signature_headers(headers, req):
         signages = ending.designature(signature)
         cig = signages[0].markers[inputage.name]
 
+        # qb64 Cigar from the "signify" marker in the Signature header
         sig = cig.qb64
-        return sig, ser
+        return sig, ser, inputage
     return None
 
 
-def verify_signed_headers(hby, aid, signature, encoded_data) -> tuple[SignatureVerificationStatus, str]:
+def verify_signed_headers(
+    hby,
+    aid,
+    signature,
+    encoded_data,
+    vdb=None,
+    signify_input=None,
+) -> tuple[SignatureVerificationStatus, str]:
     """Verify a signed request header using the AID's current key state.
     
     This function verifies a signature against an AID's current key state,
@@ -343,6 +449,16 @@ def verify_signed_headers(hby, aid, signature, encoded_data) -> tuple[SignatureV
     Returns:
         tuple[SignatureVerificationStatus, str]: Status code and message indicating success or failure
     """
+    if signify_input is not None:
+        ok, msg = _validate_signify_window(signify_input)
+        if not ok:
+            return SignatureVerificationStatus.UNAUTHORIZED, msg
+
+    if vdb is not None:
+        ok, msg = _check_signify_signature_replay(vdb, signature)
+        if not ok:
+            return SignatureVerificationStatus.UNAUTHORIZED, msg
+
     try:
         kever = hby.kevers[aid]
     except KeyError:
@@ -362,6 +478,9 @@ def verify_signed_headers(hby, aid, signature, encoded_data) -> tuple[SignatureV
             return SignatureVerificationStatus.UNAUTHORIZED, f"{aid} signature (Cigar) verification failed on encoding of request data"
     except Exception as e:
         return SignatureVerificationStatus.UNAUTHORIZED, f"Error verifying signature"
+
+    if vdb is not None:
+        _record_signify_signature(vdb, aid, signature)
 
     return SignatureVerificationStatus.SUCCESS, "Signature valid"
 
@@ -432,26 +551,92 @@ def build_cesr_from_parsed_json(parsed_json: List[Dict[str, Any]]):
     )
 
 
-def remove_seen_events(vdb, ims: bytes, said: str):
-    """Remove seen events from a list of JSON objects.
-    
-    This function removes seen events from a list of JSON objects.
-    
-    Args:
-        vdb (VerifierBaser): The verifier database
-        ims (bytes): The CESR message to remove seen events from
-        said (str): The SAID of the credential that was seen
+def presentation_body_hash(ims: bytes) -> str:
+    """SHA-256 hex digest of the raw presentation CESR body."""
+    return hashlib.sha256(ims).hexdigest()
+
+
+_IDEMPOTENT_SKIP_PARSE_STATES = {
+    CRED_CRYPT_VALID,
+    AUTH_PENDING,
+    AUTH_SUCCESS,
+    AUTH_REVOKED,
+    OBSERVER_REVOCATION_CHECK_FAILED,
+}
+
+
+def find_idempotent_presentation_state(
+    vdb, said: str, ims: bytes
+) -> Tuple[Optional[CredProcessState], bool]:
+    """Return stored state when the same body was already accepted (skip Parser.parse)."""
+    body_hash = presentation_body_hash(ims)
+    state: CredProcessState = vdb.iss.get(keys=(said,))
+    if (
+        state is not None
+        and state.state in _IDEMPOTENT_SKIP_PARSE_STATES
+        and state.body_hash == body_hash
+    ):
+        return state, True
+    return None, False
+
+
+def _event_already_ingested(hby, reger, event_said: str, event_json: dict, cred_said: str) -> bool:
+    """True when a CESR event is already in the main hby/reger databases."""
+    if not event_said or event_said == cred_said:
+        return False
+
+    event_i = (event_json or {}).get("i")
+    if event_i == cred_said:
+        return False
+
+    try:
+        saider = coring.Saider(qb64=event_said)
+        if hby.db.getEvt(saider.qb64):
+            return True
+    except Exception:
+        pass
+
+    if reger is not None:
+        try:
+            if reger.saved.get(keys=(event_said,)) is not None:
+                return True
+            if reger.ccrd.get(keys=(event_said,)) is not None:
+                return True
+        except Exception:
+            pass
+
+    if event_i and event_i in hby.kevers:
+        return True
+
+    return False
+
+
+def remove_seen_events(vdb, hby, reger, ims: bytes, said: str) -> bytes:
+    """Omit CESR events already recorded in sevts and persisted in main hby/reger.
+
+    Parser.parse requires prerequisite events to remain in the shared main DB;
+    only events confirmed ingested there may be stripped from the stream.
     """
     parsed_cesr = parse_cesr(ims.decode("utf-8"))
+    if not parsed_cesr:
+        return ims
+
     clean_parsed_cesr = []
     for cesr_event in parsed_cesr:
-        # If the event has been seen and is not the current credential and is not the issuee, skip it
-        if vdb.sevts.get(keys=(cesr_event.get("said"),)) and cesr_event.get("said") != said and cesr_event.get("json").get("i") != said:
+        event_said = cesr_event.get("said")
+        event_json = cesr_event.get("json") or {}
+        if not vdb.sevts.get(keys=(event_said,)):
+            clean_parsed_cesr.append(cesr_event)
             continue
-        clean_parsed_cesr.append(cesr_event)
+        if not _event_already_ingested(hby, reger, event_said, event_json, said):
+            clean_parsed_cesr.append(cesr_event)
+            continue
+
+    if not clean_parsed_cesr:
+        return ims
+
     cesr = build_cesr_from_parsed_json(clean_parsed_cesr)
-    cesr = bytes(cesr, "utf-8")
-    return cesr
+    return bytes(cesr, "utf-8")
 
 
 def add_seen_event(vdb, said: str, event_type: str):

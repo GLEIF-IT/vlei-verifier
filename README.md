@@ -73,7 +73,7 @@ To run the Verifier service, you need to specify a configuration file by providi
 
 ## Configuration Files
 
-The Verifier uses configuration files to define trusted LEIs, allowed roles and schemas. These files are located in:  
+The Verifier uses configuration files to define trusted LEIs and allowed schemas. These files are located in:  
 **`scripts/keri/cf`**
 
 ## Configurable Parameters

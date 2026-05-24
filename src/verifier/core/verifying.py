@@ -1,10 +1,12 @@
 import datetime
+import json
+import logging
 import os
+import threading
 import time
 from typing import Literal
 
 import falcon
-import json
 from keri import kering
 from keri.core import coring, parsing, Siger
 from keri.vdr import verifying, eventing
@@ -20,14 +22,37 @@ from verifier.core.basing import (
     AUTH_PENDING,
     AUTH_SUCCESS,
     AUTH_EXPIRE,
-    AUTH_FAIL, AidProcessState, AID_CRYPT_INVALID, AID_CRYPT_VALID, Account
+    AidProcessState,
+    AID_CRYPT_INVALID,
+    AID_CRYPT_VALID,
+    Account,
 )
 from verifier.core.resolve_env import VerifierEnvironment
-from verifier.core.utils import parse_cesr, build_cesr_from_parsed_json, process_revocations, add_root_of_trust, add_oobi, DigerBuilder, \
-    add_state_to_state_history, get_state_to_state_history, verify_signed_headers, SignatureVerificationStatus, \
-    process_signature_headers, SignatureHeaderError, add_seen_event, remove_seen_events
+from verifier.core.utils import (
+    parse_cesr,
+    build_cesr_from_parsed_json,
+    process_revocations,
+    add_root_of_trust,
+    add_oobi,
+    DigerBuilder,
+    add_state_to_state_history,
+    get_state_to_state_history,
+    verify_signed_headers,
+    SignatureVerificationStatus,
+    process_signature_headers,
+    SignatureHeaderError,
+    add_seen_event,
+    remove_seen_events,
+    validate_witness_url,
+    presentation_body_hash,
+    find_idempotent_presentation_state,
+)
 
 PresentationType = Literal["AID", "CREDENTIAL"]
+
+logger = logging.getLogger(__name__)
+
+_PRESENTATION_LOCK = threading.Lock()
 
 
 def setup(app, hby, vdb, reger, local=False):
@@ -44,7 +69,7 @@ def setup(app, hby, vdb, reger, local=False):
     tvy = eventing.Tevery(reger=reger, db=hby.db, local=local)
     vry = verifying.Verifier(hby=hby, reger=reger)
 
-    loadEnds(app, hby, vdb, tvy, vry)
+    loadEnds(app, hby, vdb, tvy, vry, reger)
     with open("./src/root_of_trust_oobis/gleif_external.json", "rb") as f:
         json_oobi_gleif = json.loads(f.read())
         aid = json_oobi_gleif.get("aid")
@@ -53,7 +78,7 @@ def setup(app, hby, vdb, reger, local=False):
         add_root_of_trust(vlei, hby, tvy, vry, vdb, aid, oobi)
 
 
-def loadEnds(app, hby, vdb, tvy, vry):
+def loadEnds(app, hby, vdb, tvy, vry, reger):
     """Load and map endpoints to process vLEI credential verifications
 
     Parameters:
@@ -62,6 +87,7 @@ def loadEnds(app, hby, vdb, tvy, vry):
         vdb (VerifierBaser): Verifier database environment
         tvy (Tevery): transaction event log event processor
         vry (Verifier): credential verification processor
+        reger (Reger): credential registry database environment
 
     """
 
@@ -69,7 +95,7 @@ def loadEnds(app, hby, vdb, tvy, vry):
     app.add_route("/health", healthEnd)
     statusEnd = StatusEndpoint()
     app.add_route("/service_status", statusEnd)
-    credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
+    credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry, reger)
     stateHistEnd = StateHistoryResourceEndpoint(vdb)
     app.add_route("/presentations/history/{aid}", stateHistEnd)
     app.add_route("/presentations/{said}", credEnd)
@@ -217,14 +243,14 @@ class OobiResourceEndpoint:
             rep.status = falcon.HTTP_ACCEPTED
             rep.data = json.dumps(
                 dict(
-                    msg=f"Successfully added new OOBI with url: {oobi_info.get("oobi")}",
+                    msg=f"Successfully added new OOBI with url: {oobi_info.get('oobi')}",
                 )
             ).encode("utf-8")
         else:
             rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(
                 dict(
-                    msg=f"Adding new OOBI with url: {oobi_info.get("oobi")} FAILED",
+                    msg=f"Adding new OOBI with url: {oobi_info.get('oobi')} FAILED",
                 )
             ).encode("utf-8")
 
@@ -289,7 +315,7 @@ class PresentationResourceEndpoint:
 
     """
 
-    def __init__(self, hby, vdb, tvy, vry):
+    def __init__(self, hby, vdb, tvy, vry, reger):
         """Create credential presentation resource endpoint instance
 
         Parameters:
@@ -297,12 +323,25 @@ class PresentationResourceEndpoint:
             vdb (VerifierBaser): Verifier database environment
             tvy (Tevery): transaction event log event processor
             vry (Verifier): credential verification event processor
+            reger (Reger): credential registry database environment
 
         """
         self.hby = hby
         self.vdb = vdb
         self.tvy = tvy
         self.vry = vry
+        self.reger = reger
+
+    def _idempotent_accept(self, rep, said: str, state: CredProcessState):
+        rep.status = falcon.HTTP_ACCEPTED
+        rep.data = json.dumps(
+            dict(
+                aid=state.aid,
+                said=said,
+                state=state.state,
+                msg=state.info or f"Presentation {said} accepted (unchanged payload)",
+            )
+        ).encode("utf-8")
 
     def on_put(self, req, rep, said):
         """Credential Presentation Resource PUT Method
@@ -344,217 +383,256 @@ class PresentationResourceEndpoint:
             ).encode("utf-8")
             return
         
-        start_time = time.time()
+        read_start = time.time()
         ims = req.bounded_stream.read()
-        end_time = time.time()
-        print(f"Time taken to read the request: {end_time - start_time} seconds")
-        # Should the `witness_url` parameter be mandatory?
-        witness_url = req.get_param("witness_url", default=None)
+        logger.debug(
+            "presentation read said=%s bytes=%d duration_s=%.3f",
+            said,
+            len(ims),
+            time.time() - read_start,
+        )
+        env = VerifierEnvironment.resolve_env()
+        if env.maxPresentationSize and len(ims) > env.maxPresentationSize:
+            rep.status = falcon.HTTP_413
+            rep.data = json.dumps(
+                dict(
+                    msg=f"presentation body exceeds limit of {env.maxPresentationSize} bytes"
+                )
+            ).encode("utf-8")
+            return
 
-        if len(self.vry.cues) > 0:
+        witness_url = req.get_param("witness_url", default=None)
+        witness_ok, witness_msg = validate_witness_url(
+            witness_url, env.witnessUrlAllowlist, env.mode
+        )
+        if not witness_ok:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg=witness_msg)).encode("utf-8")
+            return
+
+        body_hash = presentation_body_hash(ims)
+        existing, skip_parse = find_idempotent_presentation_state(self.vdb, said, ims)
+        if skip_parse:
+            self._idempotent_accept(rep, said, existing)
+            return
+
+        if not _PRESENTATION_LOCK.acquire(blocking=False):
             rep.status = falcon.HTTP_SERVICE_UNAVAILABLE
             rep.data = json.dumps(
                 dict(
                     msg=f"Verifier is busy processing another VC presentation, try credential {said} presentation again later"
                 )
             ).encode("utf-8")
-        # Remove seen events from the CESR message
-        cesr = remove_seen_events(self.vdb, ims, said)
-        parsed_cesr = parse_cesr(cesr.decode("utf-8"))
+            return
 
-        print("Starting to parse the CESR message")
-        start_time = time.time()
-        # Parse the CESR message with the seen events removed
-        parsing.Parser().parse(ims=cesr, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
+        try:
+            cesr = remove_seen_events(self.vdb, self.hby, self.reger, ims, said)
+            parsed_cesr = parse_cesr(cesr.decode("utf-8"))
 
-        # Parse the original CESR message with the seen events included
-        # parsing.Parser().parse(ims=ims, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
-        end_time = time.time()
-        print(f"Time taken to parse credential CESR: {end_time - start_time} seconds")
-        found = False
-        presentation_type: PresentationType = "CREDENTIAL"
-        saids = []
-        aid = None
-        start_time = time.time()
-        if not self.vry.cues:
-            while self.hby.kvy.cues:
-                msg = self.hby.kvy.cues.popleft()
-                if "serder" in msg:
-                    presentation_type = "AID"
-                    serder = msg["serder"]
-                    if serder.sad.get("i") == said:
-                        found = True
-            self.hby.kvy.cues.clear()
-        end_time = time.time()
-        print(f"Time taken to process the AID cue: {end_time - start_time} seconds")    
-        start_time = time.time()
-        while self.vry.cues:
-            msg = self.vry.cues.popleft()
-            if "creder" in msg:
-                creder = msg["creder"]
-                if creder.said == said:
-                    creder_attrs = creder.sad['a']
-                    if 'i' in creder_attrs:
-                        aid = creder_attrs['i']
-                    else:
-                        aid = creder.sad['i']
-                    found = True
-                    break
-
-        end_time = time.time()
-        print(f"Time taken to process the credential cue: {end_time - start_time} seconds")
-        self.vry.cues.clear()
-        if presentation_type == "CREDENTIAL":
-            if not found:
-                info = f"Presented credential {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
-                print(info)
-
-                if not self.vdb.iss.get(keys=(said,)):
-                    cred_state = CredProcessState(
-                        said=said, 
-                        state=CRED_CRYPT_INVALID, 
-                        info=info,
-                        witness_url=witness_url
-                    )
-                    self.vdb.iss.pin(keys=(said,), val=cred_state)
-                    add_state_to_state_history(self.vdb, said, cred_state)
-
-                rep.status = falcon.HTTP_BAD_REQUEST
-                rep.data = json.dumps(
-                    dict(
-                        msg=f"credential {said} from body of request did not cryptographically verify"
-                    )
-                ).encode("utf-8")
-                return
-
-            # Signed headers verification
-            env = VerifierEnvironment.resolve_env()
-            if env.mode == "production":
-                headers = req.headers
-                try:
-                    sign, data = process_signature_headers(headers, req)
-                except SignatureHeaderError as e:
-                    rep.status = falcon.HTTP_BAD_REQUEST
-                    rep.data = json.dumps(dict(msg=str(e))).encode("utf-8")
-                    return
-                encoded_data = data.encode("utf-8")
-                verification_status, verification_message = verify_signed_headers(self.hby, aid, sign, encoded_data)
-                if verification_status == SignatureVerificationStatus.UNAUTHORIZED:
-                    rep.status = falcon.HTTP_UNAUTHORIZED
-                    rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
-                    return
-                if verification_status == SignatureVerificationStatus.BAD_SIGNATURE:
-                    rep.status = falcon.HTTP_BAD_REQUEST
-                    rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
-                    return
-
-            saider = coring.Saider(qb64=said)
-            cred_attrs = creder.sad["a"]
-            creds = None
+            parse_start = time.time()
+            parsing.Parser().parse(ims=cesr, kvy=self.hby.kvy, tvy=self.tvy, vry=self.vry)
+            logger.debug(
+                "presentation parse said=%s duration_s=%.3f",
+                said,
+                time.time() - parse_start,
+            )
+            found = False
+            presentation_type: PresentationType = "CREDENTIAL"
             aid = None
-            saids = None
-            type = None
-            if "i" in cred_attrs:
-                # use issuee AID
-                aid = cred_attrs["i"]
-                saids = self.vry.reger.subjs.get(
-                    keys=aid,
-                )
-                creds = self.vry.reger.cloneCreds(saids, self.hby.db)
-                type = "issuee"
-            else:
-                # no issuee AID, use issuer
-                aid = creder.sad["i"]
-                saids = self.vry.reger.issus.get(
-                    keys=aid,
-                )
-                creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
-                type = "issuer"
+            creder = None
+            if not self.vry.cues:
+                while self.hby.kvy.cues:
+                    msg = self.hby.kvy.cues.popleft()
+                    if "serder" in msg:
+                        presentation_type = "AID"
+                        serder = msg["serder"]
+                        if serder.sad.get("i") == said:
+                            found = True
+                self.hby.kvy.cues.clear()
+            while self.vry.cues:
+                msg = self.vry.cues.popleft()
+                if "creder" in msg:
+                    creder = msg["creder"]
+                    if creder.said == said:
+                        creder_attrs = creder.sad['a']
+                        if 'i' in creder_attrs:
+                            aid = creder_attrs['i']
+                        else:
+                            aid = creder.sad['i']
+                        found = True
+                        break
 
-            # Here we don't process credentials that have been revoked(We don't update their state)
-            # If the credential was revoked we shouldn't update it's state with the new one
-            if not self.vdb.iss.get(keys=(aid,)) or (
-                    self.vdb.iss.get(keys=(aid,)).state != AUTH_REVOKED or self.vdb.iss.get(keys=(aid,)).said != said):
-                print(f"{aid} account cleared after successful presentation")
-                # clear any previous login, now that a valid credential has been presented
-                self.vdb.accts.rem(keys=(aid,))
+            self.vry.cues.clear()
+            if presentation_type == "CREDENTIAL":
+                if not found:
+                    info = f"Presented credential {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
+                    logger.info(info)
+
+                    if not self.vdb.iss.get(keys=(said,)):
+                        cred_state = CredProcessState(
+                            said=said,
+                            state=CRED_CRYPT_INVALID,
+                            info=info,
+                            witness_url=witness_url,
+                            body_hash=body_hash,
+                        )
+                        self.vdb.iss.pin(keys=(said,), val=cred_state)
+                        add_state_to_state_history(self.vdb, said, cred_state)
+
+                    rep.status = falcon.HTTP_BAD_REQUEST
+                    rep.data = json.dumps(
+                        dict(
+                            msg=f"credential {said} from body of request did not cryptographically verify"
+                        )
+                    ).encode("utf-8")
+                    return
+
+                if env.mode == "production":
+                    headers = req.headers
+                    try:
+                        sign, data, signify_input = process_signature_headers(headers, req)
+                    except SignatureHeaderError as e:
+                        rep.status = falcon.HTTP_BAD_REQUEST
+                        rep.data = json.dumps(dict(msg=str(e))).encode("utf-8")
+                        return
+                    encoded_data = data.encode("utf-8")
+                    verification_status, verification_message = verify_signed_headers(
+                        self.hby, aid, sign, encoded_data, vdb=self.vdb, signify_input=signify_input
+                    )
+                    if verification_status == SignatureVerificationStatus.UNAUTHORIZED:
+                        rep.status = falcon.HTTP_UNAUTHORIZED
+                        rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
+                        return
+                    if verification_status == SignatureVerificationStatus.BAD_SIGNATURE:
+                        rep.status = falcon.HTTP_BAD_REQUEST
+                        rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
+                        return
+
+                saider = coring.Saider(qb64=said)
+                cred_attrs = creder.sad["a"]
+                type = None
+                if "i" in cred_attrs:
+                    aid = cred_attrs["i"]
+                    type = "issuee"
+                else:
+                    aid = creder.sad["i"]
+                    type = "issuer"
+
+                creds = self.vry.reger.cloneCreds((saider,), self.hby.db)
+
+                cur_aid_state = self.vdb.iss.get(keys=(aid,))
+                preserve_auth = (
+                    cur_aid_state is not None
+                    and cur_aid_state.state == AUTH_SUCCESS
+                    and cur_aid_state.said != said
+                )
 
                 info = f"Credential {said} presented for {aid} is cryptographically valid"
-                print(info)
+                logger.info(info)
                 cred_state = CredProcessState(
                     said=said,
                     aid=aid,
-                    state=CRED_CRYPT_VALID, 
+                    state=CRED_CRYPT_VALID,
                     info=info,
-                    witness_url=witness_url
+                    witness_url=witness_url,
+                    body_hash=body_hash,
                 )
-                self.vdb.iss.pin(keys=(aid,), val=cred_state)
-                self.vdb.iss.pin(keys=(said,), val=cred_state)
-                add_state_to_state_history(self.vdb, aid, cred_state)
 
-                for event in parsed_cesr:
-                    add_seen_event(self.vdb, event.get("said"), event.get("json").get("t"))
-                # Here we need to check if the credential was revoked and if so we update it's state to AUTH_REVOKED
-                process_revocations(self.vdb, creds, said)
-                rep.status = falcon.HTTP_ACCEPTED
-                rep.data = json.dumps(
-                    dict(
-                        creds=json.dumps(creds),
-                        aid=aid,
-                        msg=info,
-                    )
-                ).encode("utf-8")
-            else:
-                rep.status = falcon.HTTP_ACCEPTED
-                rep.data = json.dumps(
-                    dict(
-                        creds=json.dumps(creds),
-                        aid=aid,
-                        msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
-                    )
-                ).encode("utf-8")
-            return
-        elif presentation_type == "AID":
-            aid = said
-            state = self.vdb.icp.get(keys=(said,))
-            if state:
-                rep.status = falcon.HTTP_ACCEPTED
-                rep.data = json.dumps(
-                    dict(
-                        aid=aid,
-                        msg=f"AID {aid} presentation status: {state.state}",
-                    )
-                ).encode("utf-8")
+                if preserve_auth:
+                    self.vdb.iss.pin(keys=(said,), val=cred_state)
+                    if parsed_cesr:
+                        for event in parsed_cesr:
+                            event_json = event.get("json") or {}
+                            add_seen_event(
+                                self.vdb, event.get("said"), event_json.get("t")
+                            )
+                    process_revocations(self.vdb, creds, said)
+                    rep.status = falcon.HTTP_ACCEPTED
+                    rep.data = json.dumps(
+                        dict(aid=aid, said=said, msg=info)
+                    ).encode("utf-8")
+                    return
+
+                if not cur_aid_state or (
+                        cur_aid_state.state != AUTH_REVOKED
+                        or cur_aid_state.said != said
+                ):
+                    logger.info("%s account cleared after successful presentation", aid)
+                    self.vdb.accts.rem(keys=(aid,))
+
+                    self.vdb.iss.pin(keys=(aid,), val=cred_state)
+                    self.vdb.iss.pin(keys=(said,), val=cred_state)
+                    add_state_to_state_history(self.vdb, aid, cred_state)
+
+                    if parsed_cesr:
+                        for event in parsed_cesr:
+                            event_json = event.get("json") or {}
+                            add_seen_event(
+                                self.vdb, event.get("said"), event_json.get("t")
+                            )
+                    process_revocations(self.vdb, creds, said)
+                    rep.status = falcon.HTTP_ACCEPTED
+                    rep.data = json.dumps(
+                        dict(
+                            aid=aid,
+                            said=said,
+                            msg=info,
+                        )
+                    ).encode("utf-8")
+                else:
+                    rep.status = falcon.HTTP_ACCEPTED
+                    rep.data = json.dumps(
+                        dict(
+                            aid=aid,
+                            said=said,
+                            msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
+                        )
+                    ).encode("utf-8")
                 return
-            if not found:
-                info = f"Presented AID {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
-                print(info)
-                aid_state = AidProcessState(
-                    aid=aid, state=AID_CRYPT_INVALID, info=info
-                )
-                self.vdb.icp.pin(keys=(said,), val=aid_state)
+
+            if presentation_type == "AID":
+                aid = said
+                state = self.vdb.icp.get(keys=(said,))
+                if state:
+                    rep.status = falcon.HTTP_ACCEPTED
+                    rep.data = json.dumps(
+                        dict(
+                            aid=aid,
+                            msg=f"AID {aid} presentation status: {state.state}",
+                        )
+                    ).encode("utf-8")
+                    return
+                if not found:
+                    info = f"Presented AID {said} was NOT cryptographically valid, administrator will need to review verifier logs to determine the problem"
+                    logger.info(info)
+                    aid_state = AidProcessState(
+                        aid=aid, state=AID_CRYPT_INVALID, info=info
+                    )
+                    self.vdb.icp.pin(keys=(said,), val=aid_state)
+                    add_state_to_state_history(self.vdb, aid, aid_state)
+                    rep.status = falcon.HTTP_BAD_REQUEST
+                    rep.data = json.dumps(
+                        dict(
+                            msg=f"AID {aid} from body of request did not cryptographically verify"
+                        )
+                    ).encode("utf-8")
+                    return
+
+                info = f"AID {aid} presented is cryptographically valid"
+                logger.info(info)
+                aid_state = AidProcessState(aid=aid, state=AID_CRYPT_VALID, info=info)
+                self.vdb.icp.pin(keys=(aid,), val=aid_state)
                 add_state_to_state_history(self.vdb, aid, aid_state)
-                rep.status = falcon.HTTP_BAD_REQUEST
+                rep.status = falcon.HTTP_ACCEPTED
                 rep.data = json.dumps(
                     dict(
-                        msg=f"AID {aid} from body of request did not cryptographically verify"
+                        aid=aid,
+                        msg=f"AID {aid} presentation status: {aid_state.state}",
                     )
                 ).encode("utf-8")
                 return
-
-            info = f"AID {aid} presented is cryptographically valid"
-            print(info)
-            aid_state = AidProcessState(aid=aid, state=AID_CRYPT_VALID, info=info)
-            self.vdb.icp.pin(keys=(aid,), val=aid_state)
-            add_state_to_state_history(self.vdb, aid, aid_state)
-            rep.status = falcon.HTTP_ACCEPTED
-            rep.data = json.dumps(
-                dict(
-                    aid=aid,
-                    msg=f"AID {aid} presentation status: {aid_state.state}",
-                )
-            ).encode("utf-8")
-            return
+        finally:
+            _PRESENTATION_LOCK.release()
 
     def on_get(self, req, rep, said):
         """Loop over any credential presentations in the iss database.
@@ -565,16 +643,16 @@ class PresentationResourceEndpoint:
         """
 
         state: CredProcessState = self.vdb.iss.get(keys=(said,))
-        is_aged_off, state = cred_age_off(state, 600.0)
         if state is None:
-            rep.status = falcon.HTTP_NO_CONTENT
+            rep.status = falcon.HTTP_BAD_REQUEST
             rep.data = json.dumps(
                 dict(
-                    msg=f"Cred {said} is not found: state is '{state.state}', info='{state.info}'",
+                    msg=f"Credential presentation for SAID={said} is not found'",
                 )
             ).encode("utf-8")
             return
-        elif is_aged_off:
+        is_aged_off, state = cred_age_off(state, 600.0)
+        if is_aged_off:
             rep.status = falcon.HTTP_RESET_CONTENT
             rep.data = json.dumps(
                 dict(
@@ -640,10 +718,10 @@ class AuthorizationResourceEnd:
     def _process_cred_auth(self, aid: str):
         acct: Account = self.vdb.accts.get(keys=(aid,))
         state: CredProcessState = self.vdb.iss.get(keys=(aid,))
-        cred_presented = True
+        cred_presented = state is not None
         auth_success = False
-        if acct is None or state is None or state.state == AUTH_EXPIRE:
-            auth_success = False
+
+        if acct is None or state is None:
             if state is None:
                 cred_presented = False
                 data = dict(
@@ -653,14 +731,23 @@ class AuthorizationResourceEnd:
                 data = dict(
                     msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, info: {state.info}"
                 )
+        elif state.state != AUTH_SUCCESS:
+            data = dict(
+                msg=f"identifier {aid} presented credentials {state.said}, w/ status {state.state}, info: {state.info}"
+            )
+        elif acct.said != state.said:
+            data = dict(
+                msg=f"identifier {aid} account credential {acct.said} does not match presentation state {state.said}"
+            )
         else:
-            state: CredProcessState = self.vdb.iss.get(keys=(aid,))
             auth_success = True
+            facts = self.vdb.facts.get(keys=(aid,))
+            role = facts.role if facts else state.role
             data = dict(
                 aid=aid,
                 said=acct.said,
                 lei=acct.lei,
-                role=state.role,
+                role=role,
                 msg=f"AID {aid} w/ lei {acct.lei} has valid login account",
             )
 
@@ -699,13 +786,15 @@ class AuthorizationResourceEnd:
         if env.mode == "production":
             headers = req.headers
             try:
-                sign, data = process_signature_headers(headers, req)
+                sign, data, signify_input = process_signature_headers(headers, req)
             except SignatureHeaderError as e:
                 rep.status = falcon.HTTP_BAD_REQUEST
                 rep.data = json.dumps(dict(msg=str(e))).encode("utf-8")
                 return
             encoded_data = data.encode("utf-8")
-            verification_status, verification_message = verify_signed_headers(self.hby, aid, sign, encoded_data)
+            verification_status, verification_message = verify_signed_headers(
+                self.hby, aid, sign, encoded_data, vdb=self.vdb, signify_input=signify_input
+            )
             if verification_status == SignatureVerificationStatus.UNAUTHORIZED:
                 rep.status = falcon.HTTP_UNAUTHORIZED
                 rep.data = json.dumps(dict(msg=verification_message)).encode("utf-8")
@@ -801,6 +890,24 @@ class RequestVerifierResourceEnd:
             rep.status = falcon.HTTP_NOT_FOUND
             rep.data = json.dumps(
                 dict(msg=f"unknown {aid} used to sign header")
+            ).encode("utf-8")
+            return
+
+        acct = self.vdb.accts.get(keys=(aid,))
+        if acct is None:
+            rep.status = falcon.HTTP_FORBIDDEN
+            rep.data = json.dumps(
+                dict(msg=f"identifier {aid} has no valid credential for access")
+            ).encode("utf-8")
+            return
+
+        iss_state: CredProcessState = self.vdb.iss.get(keys=(aid,))
+        if iss_state is None or iss_state.state != AUTH_SUCCESS or iss_state.said != acct.said:
+            rep.status = falcon.HTTP_FORBIDDEN
+            rep.data = json.dumps(
+                dict(
+                    msg=f"identifier {aid} is not authorized (state={getattr(iss_state, 'state', None)})"
+                )
             ).encode("utf-8")
             return
 

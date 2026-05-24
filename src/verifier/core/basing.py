@@ -44,6 +44,7 @@ class CredProcessState:
     info: Optional[str] = None
     role: Optional[str] = None
     witness_url: Optional[str] = None
+    body_hash: Optional[str] = None
     date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
     def __iter__(self):
@@ -74,11 +75,14 @@ def cred_age_off(state: CredProcessState, timeout: float):
     # cancel presentations that have been around longer than timeout
     now = nowUTC()
     age = now - datetime.datetime.fromisoformat(state.date)
-    state = None
     if state.state != CRED_AGE_OFF and age > datetime.timedelta(seconds=timeout):
-        state = CredProcessState(said=state.said, state=CRED_AGE_OFF,
-                                 info=f"Credential was {age} which exceeds timeout threshold {timeout}")
-        return True, state
+        aged = CredProcessState(
+            said=state.said,
+            aid=state.aid,
+            state=CRED_AGE_OFF,
+            info=f"Credential was {age} which exceeds timeout threshold {timeout}",
+        )
+        return True, aged
     return False, state
 
 
@@ -117,6 +121,33 @@ class SeenEvent:
     said: str = None
     event_type: str = None
     date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    def __iter__(self):
+        return iter(asdict(self).values())
+
+
+@dataclass
+class AuthorizationFacts:
+    """Cached business-authorization outcome for an issuee AID."""
+    aid: str = None
+    cred_said: str = None
+    lei: Optional[str] = None
+    role: Optional[str] = None
+    schema: Optional[str] = None
+    state: Optional[str] = None
+    policy_version: Optional[str] = None
+    validated_at: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+
+    def __iter__(self):
+        return iter(asdict(self).values())
+
+
+@dataclass
+class UsedSignifySignature:
+    """Tracks a consumed HTTP Signify signature (signify marker) to prevent replay."""
+    signify: str = None
+    aid: str = None
+    date: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+
     def __iter__(self):
         return iter(asdict(self).values())
 
@@ -220,6 +251,12 @@ class VerifierBaser(dbing.LMDBer):
         # Seen events database
         self.sevts = None
 
+        # Consumed HTTP Signify signatures (replay protection)
+        self.used_sigs = None
+
+        # Cached authorization decisions keyed by issuee AID
+        self.facts = None
+
         if (mapSize := os.getenv(self.KERIBaserMapSizeKey)) is not None:
             try:
                 self.MapSize = int(mapSize)
@@ -267,6 +304,12 @@ class VerifierBaser(dbing.LMDBer):
 
         # Seen events database
         self.sevts = koming.Komer(db=self, subkey='seen_events.', schema=SeenEvent)
+
+        # HTTP Signify signatures already used for signature verification
+        self.used_sigs = koming.Komer(db=self, subkey='used_sigs.', schema=UsedSignifySignature)
+
+        # Cached authorization facts keyed by issuee AID
+        self.facts = koming.Komer(db=self, subkey='facts.', schema=AuthorizationFacts)
 
         # Data chunks for uploaded report, indexed by DIG plus chunk index
         self.imgs = self.env.open_db(key=b'imgs.')
