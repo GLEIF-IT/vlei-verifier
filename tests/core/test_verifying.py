@@ -255,9 +255,10 @@ def test_ecr(seeder):
         hby.kevers[hab.pre] = hab.kever
         auth = Authorizer(hby, vdb, eacrdntler.rgy.reger)
         auth.processPresentations()
-        # ecr auth cred is not authorized
+        # ecr auth cred is not authorized; ECR authorization is unchanged
         result = client.simulate_get(f"/authorizations/{hab.pre}")
-        assert result.status == falcon.HTTP_401
+        assert result.status == falcon.HTTP_OK
+        assert result.json['said'] == ecsaid
 
 
 def test_ecr_missing(seeder):

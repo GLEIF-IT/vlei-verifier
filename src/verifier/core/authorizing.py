@@ -6,23 +6,52 @@ verfier.core.handling module
 EXN Message handling
 """
 import datetime
-from typing import List, Set
-import os
+import hashlib
+import json
 from typing import List
+import os
 from hio.base import doing
 
 from keri import kering
 from keri.core import coring
 from keri.help import helping
 
-from verifier.core.basing import Account, CredProcessState, AUTH_REVOKED, AUTH_PENDING, AUTH_SUCCESS, AUTH_EXPIRE, \
-    AUTH_FAIL, CRED_CRYPT_VALID, AID_CRYPT_VALID, AidProcessState, AID_AUTH_SUCCESS, OBSERVER_REVOCATION_CHECK_FAILED
-from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE
+from verifier.core.basing import (
+    Account,
+    AuthorizationFacts,
+    CredProcessState,
+    AUTH_REVOKED,
+    AUTH_PENDING,
+    AUTH_SUCCESS,
+    AUTH_EXPIRE,
+    AUTH_FAIL,
+    CRED_CRYPT_VALID,
+    CRED_CRYPT_INVALID,
+    AID_CRYPT_VALID,
+    AidProcessState,
+    AID_AUTH_SUCCESS,
+    OBSERVER_REVOCATION_CHECK_FAILED,
+)
+from verifier.core.constants import Schema, EBA_DATA_SUBMITTER_ROLE, EBA_DATA_ADMIN_ROLE
 from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.utils import add_state_to_state_history
 
 # Hard-coded vLEI Engagement context role to accept.  This would be configurable in production
 DEFAULT_EBA_ROLE = "EBA Data Submitter"
+
+_ECR_LEAF_SCHEMAS = frozenset({
+    Schema.ECR_SCHEMA,
+    Schema.ECR_SCHEMA_PROD,
+    Schema.TEST_SCHEMA,
+})
+
+_SKIP_ISS_STATES = frozenset({
+    AUTH_SUCCESS,
+    AUTH_FAIL,
+    AUTH_REVOKED,
+    CRED_CRYPT_INVALID,
+    OBSERVER_REVOCATION_CHECK_FAILED,
+})
 
 
 # Hard coded credential JSON Schema SAID for the vLEI Engagement Context Role Credential
@@ -92,6 +121,35 @@ class Authorizer:
         self.reger = reger
 
         self.clients = dict()
+        self._chain_cache: dict[str, tuple[bool, str]] = {}
+
+    def _policy_version(self) -> str:
+        payload = json.dumps(
+            {
+                "schemas": sorted(str(s) for s in self.env.authAllowedSchemas),
+                "leis": sorted(self.env.trustedLeis),
+                "verifyRot": self.env.verifyRootOfTrust,
+            },
+            sort_keys=True,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+    def _save_authorization_facts(self, creder, issuee_aid: str, state: str, policy_version: str):
+        facts = AuthorizationFacts(
+            aid=issuee_aid,
+            cred_said=creder.said,
+            lei=creder.attrib.get("LEI"),
+            role=self._credential_role(creder),
+            schema=creder.schema,
+            state=state,
+            policy_version=policy_version,
+        )
+        self.vdb.facts.pin(keys=(issuee_aid,), val=facts)
+
+    @staticmethod
+    def _credential_role(creder) -> str | None:
+        role = creder.attrib.get("engagementContextRole") or creder.attrib.get("officialRole")
+        return role if role else None
 
     def processPresentations(self):
         """Loop over any credential presentations in the iss database.
@@ -101,8 +159,13 @@ class Authorizer:
 
         """
 
+        self._chain_cache.clear()
+        policy_version = self._policy_version()
+
         for (aid,), state in self.vdb.iss.getItemIter():
-            # cancel presentations that have been around longer than timeout
+            if state.state in _SKIP_ISS_STATES:
+                continue
+
             now = helping.nowUTC()
             age = now - datetime.datetime.fromisoformat(state.date)
             cred_state = None
@@ -132,13 +195,30 @@ class Authorizer:
                 # are there multiple creds for the same said?
                 passed_cred_filters, info = self.cred_filters(creder)
                 if passed_cred_filters:
-                    cred_state = CredProcessState(aid=cur_state.aid, said=state.said, state=AUTH_SUCCESS, info=info,
-                                                  role=creder.attrib["engagementContextRole"] or creder.attrib[
-                                                      "officialRole"], witness_url=state.witness_url)
+                    role = self._credential_role(creder)
+                    cred_state = CredProcessState(
+                        aid=cur_state.aid,
+                        said=state.said,
+                        state=AUTH_SUCCESS,
+                        info=info,
+                        role=role,
+                        witness_url=state.witness_url,
+                        body_hash=cur_state.body_hash,
+                    )
                     acct = Account(creder.attrib["i"], creder.said, creder.attrib["LEI"])
                     self.vdb.accts.pin(keys=(creder.attrib["i"],), val=acct)
+                    self._save_authorization_facts(
+                        creder, creder.attrib["i"], AUTH_SUCCESS, policy_version
+                    )
                 else:
-                    cred_state = CredProcessState(aid=cur_state.aid, said=state.said, state=AUTH_FAIL, info=info, witness_url=state.witness_url)
+                    cred_state = CredProcessState(
+                        aid=cur_state.aid,
+                        said=state.said,
+                        state=AUTH_FAIL,
+                        info=info,
+                        witness_url=state.witness_url,
+                        body_hash=cur_state.body_hash,
+                    )
                 self.vdb.iss.pin(keys=(aid,), val=cred_state)
                 add_state_to_state_history(self.vdb, aid, cred_state)
 
@@ -179,6 +259,9 @@ class Authorizer:
             creder (Creder):  Serializable credential object
 
         """
+        if creder.said in self._chain_cache:
+            return self._chain_cache[creder.said]
+
         res = False, f"Cred filters not processed"
         print("SCHEMA!!: ", creder.schema, self.env.authAllowedSchemas)
         if creder.schema in self.env.authAllowedSchemas:
@@ -192,15 +275,18 @@ class Authorizer:
             if creder.issuer not in self.hby.kevers:
                 res = False, f"unknown issuer {creder.issuer}"
             elif creder.attrib["i"] is None or creder.attrib["i"] not in self.hby.kevers:
-                print(f"unknown issuee {creder.attrib["i"]}")
+                res = False, f"unknown issuee {creder.attrib['i']}"
             elif len(self.env.trustedLeis) > 0 and creder.attrib["LEI"] not in self.env.trustedLeis:
-                # only process LEI filter if LEI list has been configured
-                res = False, f"LEI: {creder.attrib["LEI"]} not allowed"
+                res = False, f"LEI: {creder.attrib['LEI']} not allowed"            
             elif not (chain := self.chain_filters(creder))[0]:
                 res = chain
             else:
-                res = True, f"Credential passed filters for user {creder.attrib["i"]} with LEI {creder.attrib["LEI"]}"
+                res = True, (
+                    f"Credential passed filters for user {creder.attrib['i']} "
+                    f"with LEI {creder.attrib['LEI']}"
+                )
         print(f"Cred filter status {res[0]}, {res[1]}")
+        self._chain_cache[creder.said] = res
         return res
 
     def chain_filters(self, creder) -> tuple[bool, str]:
@@ -315,7 +401,7 @@ class Authorizer:
                 chain_msg = chain[1] + f"->{cred_type}"
         else:
             chain_success = False
-            chain_msg = f"{cred_type} should chain to schema {dict.keys()}, not {edge["s"]}"
+            chain_msg = f"{cred_type} should chain to schema {valid_edges.keys()}, not {edge['s']}"
 
         if not chain_success:
             chain_msg = f"{cred_type} chain validation failed, " + chain_msg

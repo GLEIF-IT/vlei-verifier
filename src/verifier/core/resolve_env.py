@@ -15,7 +15,8 @@ class VerifierEnvironment:
     verifyRootOfTrust: bool = True
     revocationCheck: bool = True
     authAllowedSchemas: List = field(default_factory=lambda: [])
-
+    witnessUrlAllowlist: List[str] = field(default_factory=list)
+    maxPresentationSize: int = 0
     _instance: "VerifierEnvironment" = None
 
     def __new__(cls, *args, **kwargs):

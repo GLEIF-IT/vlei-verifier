@@ -1,10 +1,20 @@
-import requests
+import logging
 
+import requests
+from keri.core import parsing
+from keri.vdr import verifying, eventing
 from hio.base import doing
+
 from verifier.core.basing import CredProcessState, AUTH_REVOKED, OBSERVER_REVOCATION_CHECK_FAILED
 from verifier.core.resolve_env import VerifierEnvironment
-from verifier.core.utils import add_state_to_state_history, process_revocations_from_event_log, parse_cesr
-from keri.vdr import verifying, eventing
+from verifier.core.utils import (
+    add_state_to_state_history,
+    parse_cesr,
+    process_revocations_from_event_log,
+    validate_witness_url,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class CredentialRevocationChecker(doing.Doer):
@@ -61,29 +71,41 @@ class CredentialRevocationChecker(doing.Doer):
 
             # If witness URL is provided, check with the witness
             if state.witness_url:
+                witness_ok, witness_msg = validate_witness_url(
+                    state.witness_url, env.witnessUrlAllowlist, env.mode
+                )
+                if not witness_ok:
+                    self._mark_as_revocation_check_failed(state.said, witness_msg)
+                    continue
                 try:
-                    witness_response = requests.get(f"{state.witness_url}/query?typ=tel&vcid={state.said}")
+                    witness_response = requests.get(
+                        f"{state.witness_url}/query?typ=tel&vcid={state.said}",
+                        timeout=30,
+                    )
                     if witness_response.status_code == 200:
                         witness_creds = witness_response.text
                         parsed_cesr = parse_cesr(witness_creds)
                         if parsed_cesr: 
                             process_revocations_from_event_log(self.vdb, state.said, parsed_cesr)
                         else:
-                            reason = f"No valid CESR found for credential {state.said}"
+                            reason = f"No valid OOBI found for credential {state.said}"
                             print(reason)
                             self._mark_as_revocation_check_failed(state.said, reason)
                     continue
-                except requests.exceptions.ConnectionError as e:
-                    reason = f"Error checking witness for credential {state.said}: Witness {state.witness_url} is unavailable"
-                    print(reason)
+                except requests.exceptions.ConnectionError:
+                    reason = (
+                        f"Error checking witness for credential {state.said}: "
+                        f"Witness {state.witness_url} is unavailable"
+                    )
+                    logger.warning(reason)
                     self._mark_as_revocation_check_failed(state.said, reason)
-                except Exception as e:
+                except Exception:
                     reason = f"Error checking witness for credential {state.said}: unexpected error"
-                    print(reason)
+                    logger.exception(reason)
                     self._mark_as_revocation_check_failed(state.said, reason)
 
             else:
-                print(f"No witness URL provided for credential {state.said}")
                 reason = f"No witness URL provided for credential {state.said}"
+                logger.info(reason)
                 self._mark_as_revocation_check_failed(state.said, reason)
 

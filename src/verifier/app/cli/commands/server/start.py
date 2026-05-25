@@ -19,6 +19,7 @@ from keri.app import keeping, configing, habbing, oobiing
 from keri.app.cli.common import existing
 from keri.vdr import viring
 from verifier.core import verifying, authorizing, basing, reporting
+from verifier.core import constants
 from verifier.core.constants import Schema
 from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.observing import CredentialRevocationChecker
@@ -73,27 +74,33 @@ class EnvironmentMiddleware:
             )
 
 class RequestResponseLoggerMiddleware:
-    def process_request(self, req, resp):
-        # Log the request details
-        timestamp = datetime.datetime.now().isoformat()
-        method = req.method
-        path = req.path
+    """Logs request metadata; response bodies are omitted unless explicitly enabled."""
 
-        print(f"[{timestamp}] Incoming Request: {method} {path}")
+    def __init__(self):
+        self._log_bodies = os.getenv("VERIFIER_LOG_RESPONSE_BODIES", "false").lower() in (
+            "true",
+            "1",
+        )
+
+    def process_request(self, req, resp):
+        timestamp = datetime.datetime.now().isoformat()
+        logging.getLogger("verifier.http").info(
+            "[%s] Incoming %s %s", timestamp, req.method, req.path
+        )
 
     def process_response(self, req, resp, resource, req_succeeded):
         timestamp = datetime.datetime.now().isoformat()
-        method = req.method
-        path = req.path
-        status = resp.status
-        body = resp.data if resp.data else resp.text
-
-        # Convert body to a JSON string if applicable
-        body_str = body
-
-        print(f"[{timestamp}] Completed Request: {method} {path}")
-        print(f"[{timestamp}] Response Status: {status}")
-        print(f"[{timestamp}] Response Body:\n{body_str}\n")
+        logger = logging.getLogger("verifier.http")
+        logger.info(
+            "[%s] Completed %s %s status=%s",
+            timestamp,
+            req.method,
+            req.path,
+            resp.status,
+        )
+        if self._log_bodies:
+            body = resp.data if resp.data else resp.text
+            logger.info("[%s] Response body: %s", timestamp, body)
 
 
 
@@ -152,17 +159,26 @@ def launch(args):
     Mode can be set via VERIFIER_MODE environment variable:
     export VERIFIER_MODE=test|production
     """
-    verifier_mode = os.environ.get("VERIFIER_MODE", "test")
+    verifier_mode = os.environ.get("VERIFIER_MODE", "production")
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
     trusted_leis = config.get("trustedLeis", [])
     revocation_check = config.get("revocationCheck", False)
-
+    max_presentation_size = config.get("maxPresentationSize", 0)
+    witness_allowlist = list(config.get("witnessUrlAllowlist", []))
+    env_witness_allowlist = os.getenv("WITNESS_URL_ALLOWLIST", "")
+    if env_witness_allowlist:
+        witness_allowlist.extend(
+            entry.strip() for entry in env_witness_allowlist.split(",") if entry.strip()
+        )
+    
     ve_init_params = {
+        "maxPresentationSize": max_presentation_size,
         "configuration": cf,
         "mode": verifier_mode,
         "trustedLeis": trusted_leis if trusted_leis else [],
         "verifyRootOfTrust": verify_rot,
-        "revocationCheck": revocation_check
+        "revocationCheck": revocation_check,
+        "witnessUrlAllowlist": witness_allowlist
     }
 
     print("ALLOWED", allowed_schemas)
