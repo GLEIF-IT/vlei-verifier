@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import sys
 
 import falcon
 from hio.core import http
@@ -136,7 +137,20 @@ def launch(args):
                             reopen=True,
                             clear=False)
 
-    help.ogler.level = logging.ERROR
+    # Ensure verifier logs go to console by default. Without a handler, INFO logs
+    # from e.g. RequestResponseLoggerMiddleware may not show up anywhere.
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            stream=sys.stdout,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
+
+    help.ogler.level = logging.INFO
+    logging.getLogger("verifier").setLevel(logging.INFO)
+    logging.getLogger("verifier.http").setLevel(logging.INFO)
+
     silence_external_console_logs()
     config = cf.get()
     allowed_schemas = [
