@@ -338,8 +338,7 @@ class PresentationResourceEndpoint:
             dict(
                 aid=state.aid,
                 said=said,
-                state=state.state,
-                msg=state.info or f"Presentation {said} accepted (unchanged payload)",
+                msg=f"Credential {said} presented for {state.aid} is cryptographically valid"
             )
         ).encode("utf-8")
 
