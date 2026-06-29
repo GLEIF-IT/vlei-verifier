@@ -338,8 +338,7 @@ class PresentationResourceEndpoint:
             dict(
                 aid=state.aid,
                 said=said,
-                state=state.state,
-                msg=state.info or f"Presentation {said} accepted (unchanged payload)",
+                msg=f"Credential {said} presented for {state.aid} is cryptographically valid"
             )
         ).encode("utf-8")
 
@@ -574,6 +573,7 @@ class PresentationResourceEndpoint:
                     rep.status = falcon.HTTP_ACCEPTED
                     rep.data = json.dumps(
                         dict(
+                            creds=json.dumps(creds),
                             aid=aid,
                             said=said,
                             msg=info,
@@ -583,6 +583,7 @@ class PresentationResourceEndpoint:
                     rep.status = falcon.HTTP_ACCEPTED
                     rep.data = json.dumps(
                         dict(
+                            creds=json.dumps(creds),
                             aid=aid,
                             said=said,
                             msg=f"{said} for {aid} as {type} is {CRED_CRYPT_VALID}",
