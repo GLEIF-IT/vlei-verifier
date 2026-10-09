@@ -5,7 +5,7 @@ from keri.core import parsing
 from keri.vdr import verifying, eventing
 from hio.base import doing
 
-from verifier.core.basing import CredProcessState, AUTH_REVOKED, OBSERVER_REVOCATION_CHECK_FAILED
+from verifier.core.basing import CredProcessState, AUTH_REVOKED, OBSERVER_REVOCATION_CHECK_FAILED, CRED_CRYPT_INVALID
 from verifier.core.resolve_env import VerifierEnvironment
 from verifier.core.utils import (
     add_state_to_state_history,
@@ -16,13 +16,19 @@ from verifier.core.utils import (
 
 logger = logging.getLogger(__name__)
 
+_SKIP_REV_CHECK_STATES = frozenset({
+    AUTH_REVOKED,
+    CRED_CRYPT_INVALID,
+    OBSERVER_REVOCATION_CHECK_FAILED,
+})
+
 
 class CredentialRevocationChecker(doing.Doer):
     """Doer (coroutine) responsible for checking credential revocation status from witnesses."""
-    
+
     def __init__(self, hby, vdb, reger, interval: float = 5.0):
         """Initialize the credential revocation checker.
-        
+
         Parameters:
             hby: KERI Habery instance
             vdb: VerifierBaser instance
@@ -37,7 +43,7 @@ class CredentialRevocationChecker(doing.Doer):
         self.vry = verifying.Verifier(hby=hby, reger=reger)
         self.tvy = eventing.Tevery(reger=reger, db=hby.db, local=False)
         super(CredentialRevocationChecker, self).__init__()
-            
+
     def recur(self, tyme):
         """Process all credential revocations once per recurrence."""
         if tyme - self.lastCheck >= self.interval:
@@ -52,12 +58,12 @@ class CredentialRevocationChecker(doing.Doer):
             cur_state: CredProcessState = self.vdb.iss.get(keys=(aid,))
         rev_state = CredProcessState(aid=aid, said=said, info=reason, state=OBSERVER_REVOCATION_CHECK_FAILED,
                                      witness_url=cur_state.witness_url)
-        if self.vdb.iss.get(keys=(aid,)):
+        if aid and self.vdb.iss.get(keys=(aid,)):
             self.vdb.iss.pin(keys=(aid,), val=rev_state)
+            self.vdb.accts.rem(keys=(aid,))
+            add_state_to_state_history(self.vdb, aid, rev_state)
         self.vdb.iss.pin(keys=(said,), val=rev_state)
-        self.vdb.accts.rem(keys=(aid,))
-        add_state_to_state_history(self.vdb, aid, rev_state)
-            
+
     def _check_revocations(self):
         """Check revocation status for all credentials in the database."""
         env = VerifierEnvironment.resolve_env()
@@ -66,7 +72,7 @@ class CredentialRevocationChecker(doing.Doer):
 
         # Get all credentials from the database
         for (aid,), state in self.vdb.iss.getItemIter():
-            if state.state == AUTH_REVOKED or state.state == OBSERVER_REVOCATION_CHECK_FAILED:
+            if state.state in _SKIP_REV_CHECK_STATES:
                 continue
 
             # If witness URL is provided, check with the witness
@@ -85,7 +91,7 @@ class CredentialRevocationChecker(doing.Doer):
                     if witness_response.status_code == 200:
                         witness_creds = witness_response.text
                         parsed_cesr = parse_cesr(witness_creds)
-                        if parsed_cesr: 
+                        if parsed_cesr:
                             process_revocations_from_event_log(self.vdb, state.said, parsed_cesr)
                         else:
                             reason = f"No valid OOBI found for credential {state.said}"
