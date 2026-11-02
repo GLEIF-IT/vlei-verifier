@@ -175,6 +175,7 @@ def launch(args):
     """
     verifier_mode = os.environ.get("VERIFIER_MODE", "production")
     verify_rot = os.getenv("VERIFY_ROOT_OF_TRUST", "True").lower() in ("true", "1")
+    temp_dbs = os.getenv("VERIFIER_TEMP_DBS", "False").lower() in ("true", "1")
     trusted_leis = config.get("trustedLeis", [])
     revocation_check = config.get("revocationCheck", False)
     max_presentation_size = config.get("maxPresentationSize", 0)
@@ -200,13 +201,13 @@ def launch(args):
         ve_init_params["authAllowedSchemas"] = allowed_schemas
 
     ve = VerifierEnvironment.initialize(**ve_init_params)
-    hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf, temp=True)
+    hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf, temp=temp_dbs)
 
     hbyDoer = habbing.HaberyDoer(habery=hby)  # setup doer
     obl = oobiing.Oobiery(hby=hby)
 
     reger = viring.Reger(name=hby.name, temp=hby.temp)
-    vdb = basing.VerifierBaser(name=hby.name, temp=True)
+    vdb = basing.VerifierBaser(name=hby.name, temp=temp_dbs)
     cors_middleware = falcon.CORSMiddleware(
         allow_origins='*',
         allow_credentials='*',
