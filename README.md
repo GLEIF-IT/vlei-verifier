@@ -62,6 +62,19 @@ variable 'VERIFIER_ENV=development'. And then
 send the POST request to the localhost:7676/root_of_trust/{AID-of-the-root-of-trust} with application/json+cesr format
 data containing the CESR of the new Root Of Trust.
 
+
+### Persistent vs. temporary databases
+
+The verifier's databases (the Habery `hby` and the verifier `vdb`) run in persistent
+mode by default, so credential and key state survives restarts. Set the
+`VERIFIER_TEMP_DBS` environment variable to `true` to open them with `temp=True`
+instead. In temporary mode the databases are discarded on shutdown and the verifier
+starts with a clean state on every restart, which helps for testing, CI, and local
+development. Leave it unset or `false` in production so verified state isn't lost.
+
+    VERIFIER_TEMP_DBS=true   # ephemeral: state is reset on every restart
+    VERIFIER_TEMP_DBS=false  # persistent (default): state survives restarts
+
 # Configuration:
 
 ## Running the Verifier Service
@@ -185,22 +198,5 @@ verifier server start --config-dir=scripts --config-file='verifier-config-public
 
     This endpoint performs Signed Headers verification
 
-# Peer projects
 
-### Webapp
-
-The web app (UI front-end) uses Signify/KERIA for selecting identifiers and credentials:
-
-See: [reg-pilot-webapp](https://github.com/GLEIF-IT/reg-pilot-webapp)
-
-### Server
-
-The server provides the business layer and abstracts the underlying verification, but for the most part acts as a
-pass-through that provides the ability to:
-
-* Log in using a vLEI ECR
-* Upload signed files
-* Check the status of an upload
-
-See: [reg-pilot-server](https://github.com/GLEIF-IT/reg-poc-server)
 
