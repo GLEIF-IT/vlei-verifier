@@ -74,7 +74,8 @@ setup(
     ],
     python_requires='>=3.12.2',
     install_requires=[
-        'keri==1.2.12',
+        'gleif_keri==1.2.19',
+        'gleif_hio==0.6.22',
         'mnemonic>=0.20',
         'pysodium>=0.7.17',
         'pygments>=2.19.2',
